@@ -114,7 +114,7 @@ messages carry a JSON-pointer `path` into the request body. The document is stor
 | Material submodel (not in SEM-1 §1; analogous, accepted) | `https://id.madfam.io/sm/material/{slug}/{content16}/{SubmodelIdShort}` |
 | Instance asset / shell | `https://id.madfam.io/asset/instance/{uuid}` / `https://id.madfam.io/aas/instance/{uuid}` |
 | Instance submodel | `https://id.madfam.io/sm/instance/{uuid}/{SubmodelIdShort}` |
-| Concept description | `https://id.madfam.io/concept/{term}` |
+| Concept description | `https://id.madfam.io/concept/{term}` or, for a submodel template, `https://id.madfam.io/smt/{template}/{major}/{minor}` |
 
 ## Identity and tenancy
 
