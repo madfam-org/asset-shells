@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7
 # asset-shells landing — a static page served by Caddy, non-root, port 8080. Build context = repo root.
 FROM caddy:2-alpine
 # The official image gives /usr/bin/caddy the file capability cap_net_bind_service. Under the pod's

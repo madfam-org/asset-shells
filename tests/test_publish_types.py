@@ -25,7 +25,7 @@ def test_publish_creates_then_replays(client, auth_header, admin_conn):
     assert summary["created"] is True
     assert len(summary["shells"]["created"]) == 2
     assert len(summary["submodels"]["created"]) == 5
-    assert len(summary["conceptDescriptions"]["created"]) == 4
+    assert len(summary["conceptDescriptions"]["created"]) == 5
 
     again = put(client, auth_header, body)
     assert again.status_code == 200
@@ -35,7 +35,7 @@ def test_publish_creates_then_replays(client, auth_header, admin_conn):
     topics = [r[0] for r in admin_conn.execute("SELECT topic FROM outbox ORDER BY id").fetchall()]
     assert topics.count("type_shell.published") == 2
     assert topics.count("type_release.published") == 1
-    assert topics.count("concept_description.changed") == 4
+    assert topics.count("concept_description.changed") == 5
 
 
 def test_formatting_only_differences_are_a_noop(client, auth_header):
@@ -56,7 +56,7 @@ def test_new_release_reuses_unchanged_shells(client, auth_header):
     assert second.status_code == 201
     body = second.json()
     assert len(body["shells"]["unchanged"]) == 1 and len(body["shells"]["created"]) == 1
-    assert len(body["conceptDescriptions"]["unchanged"]) == 4
+    assert len(body["conceptDescriptions"]["unchanged"]) == 5
 
 
 def test_release_is_immutable(client, auth_header):

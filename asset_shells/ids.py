@@ -33,6 +33,7 @@ _RE_INSTANCE_SHELL = re.compile(rf"^{re.escape(ID_BASE)}aas/instance/({UUID})$")
 _RE_INSTANCE_ASSET = re.compile(rf"^{re.escape(ID_BASE)}asset/instance/({UUID})$")
 _RE_INSTANCE_SUBMODEL = re.compile(rf"^{re.escape(ID_BASE)}sm/instance/({UUID})/({ID_SHORT})$")
 _RE_CONCEPT = re.compile(rf"^{re.escape(ID_BASE)}concept/({CONCEPT_TERM})$")
+_RE_TEMPLATE = re.compile(rf"^{re.escape(ID_BASE)}smt/({SLUG})/(0|[1-9][0-9]*)/(0|[1-9][0-9]*)$")
 _RE_SHA40 = re.compile(r"^[0-9a-f]{40}$")
 _RE_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _RE_TENANT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
@@ -124,6 +125,11 @@ def is_instance_asset_id(value: str) -> bool:
 
 def is_concept_id(value: str) -> bool:
     return bool(_RE_CONCEPT.match(value))
+
+
+def is_template_id(value: str) -> bool:
+    """A MADFAM submodel template id: https://id.madfam.io/smt/{template-name}/{major}/{minor}."""
+    return bool(_RE_TEMPLATE.match(value))
 
 
 def looks_like_instance_id(value: str) -> bool:

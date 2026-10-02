@@ -196,6 +196,13 @@ def solid_type_env(slug: str = "fan-duct", seed: str = "fan-duct@1.0.0", version
         }
         for term in ("parameter", "unit", "polarity", "design-licence")
     ]
+    cds.append(
+        {
+            "modelType": "ConceptDescription",
+            "id": f"{BASE}smt/parametric-model/1/0",
+            "idShort": "ParametricModelTemplate",
+        }
+    )
     return {
         "assetAdministrationShells": [shell],
         "submodels": [nameplate, parametric, mating, bom],

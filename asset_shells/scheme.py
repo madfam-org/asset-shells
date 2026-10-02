@@ -9,7 +9,8 @@ Type environments (``PUT /madfam/v1/type-environments/{commons}/{sha}``):
 * every submodel id is ``…/sm/{kind}/{slug}/{hex16}/{SubmodelIdShort}`` with ``SubmodelIdShort`` equal
   to the submodel's idShort, is referenced by exactly one shell of the same design revision, and every
   reference resolves inside the environment;
-* concept descriptions are MADFAM concepts ``…/concept/{term}``.
+* concept descriptions describe MADFAM semantic ids: concepts ``…/concept/{term}`` or submodel
+  templates ``…/smt/{template}/{major}/{minor}``.
 
 Instance environments (``POST /madfam/v1/instances``): exactly one shell
 ``…/aas/instance/{uuid}`` with ``assetKind`` = Instance and ``globalAssetId`` = ``…/asset/instance/{uuid}``,
@@ -31,6 +32,7 @@ from .ids import (
     instance_submodel_parts,
     is_concept_id,
     is_sha256,
+    is_template_id,
     parse_instance_shell_id,
     parse_type_shell_id,
     type_submodel_parts,
@@ -180,11 +182,13 @@ def type_environment_problems(env: dict, commons: str, base: str) -> list[Proble
                 )
             )
     for c, cd in enumerate(env.get("conceptDescriptions", [])):
-        if not is_concept_id(cd.get("id", "")):
+        ident = cd.get("id", "")
+        if not (is_concept_id(ident) or is_template_id(ident)):
             problems.append(
                 Problem(
                     "id_scheme",
-                    "concept descriptions are MADFAM concepts https://id.madfam.io/concept/{term}",
+                    "concept descriptions describe MADFAM semantic ids: https://id.madfam.io/concept/{term} "
+                    "or https://id.madfam.io/smt/{template}/{major}/{minor} (SEM-1 §1, §5)",
                     f"{base}/conceptDescriptions/{c}/id",
                 )
             )

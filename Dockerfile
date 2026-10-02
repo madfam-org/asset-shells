@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7
 # asset-shells API image. Two stages:
 #   build   — a virtualenv with the service and its dependencies (pip lives only here);
 #   runtime — the same Python base with that virtualenv copied in and NO pip anywhere.
@@ -6,8 +5,11 @@
 # them, so every pip copy in a shipped image reports pip's vendored versions to the scanner.
 # Nothing runs pip at runtime: uvicorn serves the app and the migrate init container runs
 # `python -m asset_shells.cli migrate`. The final RUN fails the build if any pip copy survives.
+# PYTHON_IMAGE lets a builder use a registry mirror of the same official image.
 
-FROM python:3.13-slim AS build
+ARG PYTHON_IMAGE=python:3.13-slim
+
+FROM ${PYTHON_IMAGE} AS build
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONDONTWRITEBYTECODE=1
 WORKDIR /src
 RUN python -m venv /opt/venv
@@ -18,7 +20,7 @@ RUN /opt/venv/bin/python -m pip install --no-cache-dir . \
  && /opt/venv/bin/python -m pip uninstall --yes pip \
  && rm -f /opt/venv/bin/pip /opt/venv/bin/pip3 /opt/venv/bin/pip3.13
 
-FROM python:3.13-slim AS runtime
+FROM ${PYTHON_IMAGE} AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH=/opt/venv/bin:$PATH ASSET_SHELLS_ENV=production
 RUN /usr/local/bin/python3 -m pip uninstall --yes pip \
  && rm -rf /usr/local/lib/python3.13/ensurepip /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.13 \

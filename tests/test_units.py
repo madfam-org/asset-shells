@@ -50,6 +50,8 @@ def test_identifier_parsers():
     assert ids.is_instance_asset_id("https://id.madfam.io/asset/instance/1b4e28ba-2fa1-4d2b-9e6b-1c2f3a4b5c6d")
     assert ids.is_concept_id("https://id.madfam.io/concept/wall_loops")
     assert not ids.is_concept_id("https://id.madfam.io/concept/Wall Loops")
+    assert ids.is_template_id("https://id.madfam.io/smt/mating-interfaces/1/0")
+    assert not ids.is_template_id("https://id.madfam.io/smt/mating-interfaces/01/0")
     assert ids.looks_like_instance_id("https://id.madfam.io/sm/instance/anything")
     assert ids.is_commit_sha("a" * 40) and not ids.is_commit_sha("A" * 40)
     assert ids.is_valid_tenant("org_1:x-y.z") and not ids.is_valid_tenant("") and not ids.is_valid_tenant("a b")
