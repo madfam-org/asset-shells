@@ -60,7 +60,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "asset_shells/api_*.py" = ["B008"]  # FastAPI Depends()/Query() in defaults is the framework idiom
 "tests/*" = ["S105", "S106", "S108", "S311", "S603", "S607", "BLE001"]
-"migrations/*" = ["S608"]
+"asset_shells/migrations/*" = ["S608"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

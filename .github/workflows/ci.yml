@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+# Public repository: GitHub-hosted runners on purpose (free for public repos, and pull requests from
+# forks must never execute on MADFAM's own runners). Pinned to ubuntu-24.04: ubuntu-latest moves to
+# a new major on 2026-10-19. Nothing in this workflow builds for, pushes to or deploys anything.
+jobs:
+  test:
+    name: lint, tests (PostgreSQL), licences
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          # Throwaway service container: trust auth, so no password exists anywhere in this repo.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      ASSET_SHELLS_TEST_ADMIN_URL: postgresql://asset_shells_owner@127.0.0.1:5432/asset_shells_test
+      ASSET_SHELLS_TEST_APP_URL: postgresql://asset_shells_app@127.0.0.1:5432/asset_shells_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
+      - name: Lint
+        run: ruff check . && ruff format --check .
+      - name: Test database roles
+        run: psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f scripts/test-db-setup.sql
+      - name: Tests (coverage gate 80 %)
+        run: pytest -q --cov=asset_shells --cov-report=term --cov-fail-under=80
+      - name: Licence gate (runtime dependencies only)
+        run: |
+          python -m venv /tmp/runtime
+          /tmp/runtime/bin/python -m pip install -q . pip-licenses
+          PYTHON=/tmp/runtime/bin/python scripts/check-licenses.sh
+
+  manifests:
+    name: kustomize render + manifest rules
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch kustomize
+        run: |
+          curl -sSLo kustomize.tgz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.5.0/kustomize_v5.5.0_linux_amd64.tar.gz
+          tar -xzf kustomize.tgz && chmod +x kustomize
+      - name: Render production overlay
+        run: ./kustomize build infra/k8s/production > /tmp/render.yaml && grep -c '^kind:' /tmp/render.yaml
+      - name: Manifest rules
+        run: python3 -m pip install -q pyyaml && python3 scripts/check_manifests.py /tmp/render.yaml
+
+  image:
+    name: docker build + restricted smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (no push)
+        run: docker build -t asset-shells:ci . && docker build -t asset-shells-web:ci -f web/Dockerfile .
+      - name: Smoke the images under the pod's restrictions
+        # Same posture as the Deployments: non-root, all capabilities dropped, no new privileges,
+        # read-only root filesystem.
+        run: |
+          H="--user 1001 --cap-drop ALL --security-opt no-new-privileges --read-only"
+          docker run --rm $H --tmpfs /tmp asset-shells:ci python -c "import asset_shells.app, basyx.aas; print('import ok')"
+          docker run --rm $H --tmpfs /tmp asset-shells:ci sh -c '! python -c "import pip" 2>/dev/null && ! command -v pip' && echo "no pip in the runtime image"
+          docker run --rm $H --tmpfs /tmp asset-shells:ci python -m asset_shells.cli --help >/dev/null
+          docker run --rm $H --tmpfs /data --tmpfs /config asset-shells-web:ci caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker run -d --name web $H --tmpfs /data --tmpfs /config -p 18080:8080 asset-shells-web:ci
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:18080/health && break || sleep 1; done
+          curl -fsS -o /dev/null http://127.0.0.1:18080/ && echo "landing serves"
+          docker rm -f web

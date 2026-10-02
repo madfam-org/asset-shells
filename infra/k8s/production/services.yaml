@@ -1,0 +1,31 @@
+# Service names are the enclii SERVICE names on port 80 (onboard gotcha): the tunnel routes
+# asset-shells-api.madfam.io -> asset-shells:80 and asset-shells.madfam.io -> asset-shells-web:80.
+apiVersion: v1
+kind: Service
+metadata:
+  name: asset-shells
+  namespace: asset-shells
+  labels:
+    app: asset-shells
+spec:
+  selector:
+    app.kubernetes.io/name: asset-shells-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: asset-shells-web
+  namespace: asset-shells
+  labels:
+    app: asset-shells-web
+spec:
+  selector:
+    app.kubernetes.io/name: asset-shells-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

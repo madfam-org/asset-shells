@@ -83,9 +83,11 @@ def configure_logging(level: str = "INFO") -> None:
     for handler in root.handlers:
         if not any(isinstance(f, DbErrorScrubFilter) for f in handler.filters):
             handler.addFilter(DbErrorScrubFilter())
-    # uvicorn's own loggers propagate to root; the access log carries no bodies.
+    # uvicorn's own loggers propagate to root. Its access log is silenced: the app writes one
+    # structured line per request (with request id, without client addresses).
     for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
         logging.getLogger(name).handlers.clear()
         logging.getLogger(name).propagate = True
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("psycopg").setLevel(logging.WARNING)
     logging.getLogger("psycopg.pool").setLevel(logging.WARNING)

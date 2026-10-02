@@ -13,7 +13,6 @@ import datetime as dt
 import json
 import sys
 import uuid
-from importlib import resources
 from pathlib import Path
 
 
@@ -21,11 +20,8 @@ def migrate(database_url: str | None = None, app_role: str | None = None) -> Non
     from alembic import command
     from alembic.config import Config
 
-    root = Path(str(resources.files("asset_shells"))).parent
-    ini = root / "alembic.ini"
-    if not ini.exists():
-        raise SystemExit("alembic.ini not found next to the package")
-    cfg = Config(str(ini))
+    cfg = Config()
+    cfg.set_main_option("script_location", "asset_shells:migrations")
     if database_url:
         cfg.attributes["database_url"] = database_url
     if app_role:

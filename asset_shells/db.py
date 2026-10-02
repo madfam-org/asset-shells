@@ -42,13 +42,6 @@ class UnsafeDatabaseRole(RuntimeError):
     """The runtime role would not be subject to row-level security."""
 
 
-def _configure_connection(conn: psycopg.Connection) -> None:
-    timeout = int(get_settings().db_statement_timeout_ms)
-    conn.execute("SELECT set_config('statement_timeout', %s, false)", (str(timeout),))
-    conn.execute("SELECT set_config('application_name', 'asset-shells', false)")
-    conn.commit()
-
-
 def open_pool(url: str | None = None) -> ConnectionPool:
     """Open the pool (idempotent). Raises DatabaseUnavailable after the bounded startup retry."""
     global _pool
@@ -64,8 +57,14 @@ def open_pool(url: str | None = None) -> ConnectionPool:
             conninfo,
             min_size=s.db_pool_min,
             max_size=s.db_pool_max,
-            kwargs={"row_factory": dict_row, "autocommit": False},
-            configure=_configure_connection,
+            # prepare_threshold=None: no server-side prepared statements, so the pool also works
+            # behind pgbouncer in transaction mode. application_name is a startup parameter.
+            kwargs={
+                "row_factory": dict_row,
+                "autocommit": False,
+                "prepare_threshold": None,
+                "application_name": "asset-shells",
+            },
             open=False,
             name="asset-shells",
         )
@@ -114,8 +113,14 @@ def get_pool() -> ConnectionPool:
 def transaction(tenant_id: str | None) -> Iterator[psycopg.Cursor]:
     """One transaction with the tenant context set. ``tenant_id=None`` means no tenant: only
     tenant-less (type) rows are visible and only tenant-less rows may be written."""
+    timeout = str(int(get_settings().db_statement_timeout_ms))
     with get_pool().connection() as conn, conn.transaction(), conn.cursor() as cur:
-        cur.execute("SELECT set_config(%s, %s, true)", (TENANT_SETTING, tenant_id or ""))
+        # Both settings are transaction-local (SET LOCAL semantics), so nothing leaks to the next
+        # borrower of the connection, with or without a transaction-mode pooler in between.
+        cur.execute(
+            "SELECT set_config(%s, %s, true), set_config('statement_timeout', %s, true)",
+            (TENANT_SETTING, tenant_id or "", timeout),
+        )
         yield cur
 
 
