@@ -12,7 +12,7 @@ def _sqlalchemy_url(url: str) -> str:
     # Explicit driver: SQLAlchemy 2.1 changed the default for plain postgresql:// URLs.
     for prefix in ("postgres://", "postgresql://", "postgresql+psycopg://"):
         if url.startswith(prefix):
-            return "postgresql+psycopg://" + url[len(prefix):]
+            return "postgresql+psycopg://" + url[len(prefix) :]
     raise RuntimeError("DATABASE_URL must be a postgres:// or postgresql:// URL")
 
 

@@ -37,8 +37,18 @@ CONTAINER_KEYS = {
 }
 
 _INTEGER_TYPES = {
-    "xs:integer", "xs:int", "xs:long", "xs:short", "xs:byte", "xs:nonNegativeInteger", "xs:positiveInteger",
-    "xs:nonPositiveInteger", "xs:negativeInteger", "xs:unsignedLong", "xs:unsignedInt", "xs:unsignedShort",
+    "xs:integer",
+    "xs:int",
+    "xs:long",
+    "xs:short",
+    "xs:byte",
+    "xs:nonNegativeInteger",
+    "xs:positiveInteger",
+    "xs:nonPositiveInteger",
+    "xs:negativeInteger",
+    "xs:unsignedLong",
+    "xs:unsignedInt",
+    "xs:unsignedShort",
     "xs:unsignedByte",
 }
 _DECIMAL_TYPES = {"xs:decimal", "xs:double", "xs:float"}
@@ -206,7 +216,9 @@ def _value_of(element: dict, extent: str, depth: int, max_depth: int | None) -> 
     if mt in ("RelationshipElement", "AnnotatedRelationshipElement"):
         out = {k: element[k] for k in ("first", "second") if k in element}
         if mt == "AnnotatedRelationshipElement" and element.get("annotations"):
-            out["annotations"] = collection_value(element["annotations"], extent, depth + 1, max_depth) if expand else {}
+            out["annotations"] = (
+                collection_value(element["annotations"], extent, depth + 1, max_depth) if expand else {}
+            )
         return (bool(out), out)
     if mt == "BasicEventElement":
         return ("observed" in element, {"observed": element.get("observed")})
@@ -224,9 +236,7 @@ def _value_of(element: dict, extent: str, depth: int, max_depth: int | None) -> 
     if mt == "Entity":
         out: dict = {}
         if element.get("statements") is not None:
-            out["statements"] = (
-                collection_value(element["statements"], extent, depth + 1, max_depth) if expand else {}
-            )
+            out["statements"] = collection_value(element["statements"], extent, depth + 1, max_depth) if expand else {}
         for key in ("entityType", "globalAssetId", "specificAssetIds"):
             if key in element:
                 out[key] = element[key]
@@ -244,7 +254,8 @@ def collection_value(elements: list[dict], extent: str, depth: int = 0, max_dept
 
 
 def submodel_value(submodel: dict, level: str, extent: str) -> dict:
-    return collection_value(submodel.get("submodelElements", []), extent, 0, 1 if level == "core" else None)
+    # The submodel is the requested object; its elements are the direct children (not expanded in core).
+    return collection_value(submodel.get("submodelElements", []), extent, 0, 0 if level == "core" else None)
 
 
 def element_value(element: dict, level: str, extent: str) -> object:

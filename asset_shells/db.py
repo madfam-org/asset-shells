@@ -58,6 +58,7 @@ def open_pool(url: str | None = None) -> ConnectionPool:
     conninfo = url or s.app_database_url
     if not conninfo:
         raise DatabaseUnavailable("APP_DATABASE_URL is not set")
+
     def new_pool() -> ConnectionPool:
         return ConnectionPool(
             conninfo,
@@ -74,7 +75,8 @@ def open_pool(url: str | None = None) -> ConnectionPool:
     delay = 0.5
     while True:
         try:
-            pool.open(wait=True, timeout=min(10.0, max(1.0, s.db_startup_retry_seconds)))
+            # Several attempts fit in the window: each waits at most a third of it (1-5 s).
+            pool.open(wait=True, timeout=min(5.0, max(1.0, s.db_startup_retry_seconds / 3)))
             with pool.connection() as conn:
                 conn.execute("SELECT 1")
             break
@@ -121,9 +123,7 @@ def check_role_posture(pool: ConnectionPool | None = None) -> None:
     """Fail closed if the runtime role could see past row-level security."""
     pool = pool or get_pool()
     with pool.connection() as conn, conn.cursor() as cur:
-        cur.execute(
-            "SELECT r.rolsuper, r.rolbypassrls FROM pg_roles r WHERE r.rolname = current_user"
-        )
+        cur.execute("SELECT r.rolsuper, r.rolbypassrls FROM pg_roles r WHERE r.rolname = current_user")
         row = cur.fetchone()
         if row is None or row["rolsuper"] or row["rolbypassrls"]:
             raise UnsafeDatabaseRole("the runtime role is a superuser or bypasses row-level security")

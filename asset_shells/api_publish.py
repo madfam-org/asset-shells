@@ -109,8 +109,9 @@ def get_passport_events(
     with db.transaction(tenant) as cur:
         if repository.get_shell(cur, shell_id) is None:
             raise not_found()
-        page = repository.list_passport_events(cur, shell_id, cursor, min(limit or s.default_page_limit,
-                                                                          s.max_page_limit))
+        page = repository.list_passport_events(
+            cur, shell_id, cursor, min(limit or s.default_page_limit, s.max_page_limit)
+        )
     return JSONResponse(page.body())
 
 

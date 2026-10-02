@@ -74,9 +74,7 @@ def normalise_asset_name(name: str) -> str:
 def _asset_filter(pairs: list[tuple[str, str]]) -> tuple[str, list]:
     clauses, params = [], []
     for name, value in pairs:
-        clauses.append(
-            "EXISTS (SELECT 1 FROM asset_ids a WHERE a.shell_id = s.id AND a.name = %s AND a.value = %s)"
-        )
+        clauses.append("EXISTS (SELECT 1 FROM asset_ids a WHERE a.shell_id = s.id AND a.name = %s AND a.value = %s)")
         params += [normalise_asset_name(name), value]
     return " AND ".join(clauses), params
 

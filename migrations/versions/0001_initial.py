@@ -34,9 +34,7 @@ depends_on = None
 
 TENANT = "current_setting('app.tenant_id', true)"
 # Type rows only without tenant context; instance rows only for the current tenant.
-WRITE_CHECK = (
-    f"(CASE WHEN tenant_id IS NULL THEN coalesce({TENANT}, '') = '' ELSE tenant_id = {TENANT} END)"
-)
+WRITE_CHECK = f"(CASE WHEN tenant_id IS NULL THEN coalesce({TENANT}, '') = '' ELSE tenant_id = {TENANT} END)"
 READ_CHECK = f"(tenant_id IS NULL OR tenant_id = {TENANT})"
 
 TENANT_COLUMNS = """

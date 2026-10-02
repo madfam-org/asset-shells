@@ -153,8 +153,9 @@ def unknown_attribute_problems(doc: object, definition: str, base: str = "") -> 
             return  # a non-object or open definition
         for key, value in node.items():
             if key not in allowed:
-                problems.append(Problem("unknown_attribute", f"'{key}' is not an attribute of {name}",
-                                        _pointer(base, [*path, key])))
+                problems.append(
+                    Problem("unknown_attribute", f"'{key}' is not an attribute of {name}", _pointer(base, [*path, key]))
+                )
             elif allowed[key]:
                 walk(value, allowed[key], [*path, key])
 
@@ -206,9 +207,7 @@ def sdk_problems(environment: dict, base: str = "") -> list[Problem]:
     """Strict BaSyx decode of a whole Environment. Returns problems; never raises for bad input."""
     store: aas_model.DictIdentifiableStore = aas_model.DictIdentifiableStore()
     try:
-        json_deserialization.read_aas_json_file_into(
-            store, io.StringIO(json.dumps(environment)), failsafe=False
-        )
+        json_deserialization.read_aas_json_file_into(store, io.StringIO(json.dumps(environment)), failsafe=False)
     except (aas_model.AASConstraintViolation, KeyError, ValueError, TypeError, AttributeError) as exc:
         text = str(exc) or type(exc).__name__
         return [Problem("metamodel", f"{type(exc).__name__}: {text}"[:800], base or "/")]

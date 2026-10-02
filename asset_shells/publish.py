@@ -58,8 +58,17 @@ def _insert_shell(cur, shell: dict, kind: str, tenant: str | None, derived: str 
                             publish_sha256)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (shell["id"], kind, tenant, shell.get("idShort"), info.get("globalAssetId"), derived,
-         json.dumps(shell), content_sha256(shell), publish_sha),
+        (
+            shell["id"],
+            kind,
+            tenant,
+            shell.get("idShort"),
+            info.get("globalAssetId"),
+            derived,
+            json.dumps(shell),
+            content_sha256(shell),
+            publish_sha,
+        ),
     )
     links = []
     if info.get("globalAssetId"):
@@ -80,8 +89,17 @@ def _insert_submodel(cur, submodel: dict, shell_id: str, kind: str, tenant: str 
                                content_sha256)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (submodel["id"], shell_id, kind, tenant, submodel.get("idShort"), refs, values, json.dumps(submodel),
-         content_sha256(submodel)),
+        (
+            submodel["id"],
+            shell_id,
+            kind,
+            tenant,
+            submodel.get("idShort"),
+            refs,
+            values,
+            json.dumps(submodel),
+            content_sha256(submodel),
+        ),
     )
 
 
@@ -131,7 +149,7 @@ def publish_type_release(commons: str, sha: str, body: object) -> ReleaseSummary
     if not is_commit_sha(sha):
         raise bad_request("bad_sha", "sha is the 40-hex git commit of the published commons pin")
     if not isinstance(body, dict) or not isinstance(body.get("environments"), list) or not body["environments"]:
-        raise unprocessable([Problem("body", "the body is {\"environments\": [<AAS Environment>, ...]}", "/")])
+        raise unprocessable([Problem("body", 'the body is {"environments": [<AAS Environment>, ...]}', "/")])
 
     problems: list[Problem] = []
     shells, submodels, cds = [], [], []
@@ -168,8 +186,9 @@ def publish_type_release(commons: str, sha: str, body: object) -> ReleaseSummary
         raise conflict("concurrent_publish", "a concurrent publish wrote the same identifiers; retry") from None
 
 
-def _store_release(summary: ReleaseSummary, shell_map: dict, submodel_map: dict, cd_map: dict, owner: dict,
-                   manifest: dict) -> ReleaseSummary:
+def _store_release(
+    summary: ReleaseSummary, shell_map: dict, submodel_map: dict, cd_map: dict, owner: dict, manifest: dict
+) -> ReleaseSummary:
     commons, sha, release_sha = summary.commons, summary.sha, summary.content_sha256
     with db.transaction(None) as cur:
         cur.execute("SELECT content_sha256 FROM type_releases WHERE commons = %s AND sha = %s", (commons, sha))
@@ -183,18 +202,27 @@ def _store_release(summary: ReleaseSummary, shell_map: dict, submodel_map: dict,
             return summary
 
         conflicts: list[Problem] = []
-        for table, mapping, bucket in (("shells", shell_map, summary.shells),
-                                       ("submodels", submodel_map, summary.submodels)):
-            cur.execute(f"SELECT id, content_sha256, kind FROM {table} WHERE id = ANY(%s)",  # noqa: S608
-                        (list(mapping),))
+        for table, mapping, bucket in (
+            ("shells", shell_map, summary.shells),
+            ("submodels", submodel_map, summary.submodels),
+        ):
+            cur.execute(
+                f"SELECT id, content_sha256, kind FROM {table} WHERE id = ANY(%s)",  # noqa: S608
+                (list(mapping),),
+            )
             existing = {r["id"]: r for r in cur.fetchall()}
-            for ident, doc in sorted(mapping.items()):
+            for ident in sorted(mapping):
                 found = existing.get(ident)
                 if found is None:
                     continue
                 if found["kind"] != "type" or found["content_sha256"] != manifest[table][ident]:
-                    conflicts.append(Problem("immutable", f"'{ident}' already exists with different content; "
-                                             "a changed design gets a new tree digest and so a new id"))
+                    conflicts.append(
+                        Problem(
+                            "immutable",
+                            f"'{ident}' already exists with different content; "
+                            "a changed design gets a new tree digest and so a new id",
+                        )
+                    )
                 else:
                     bucket["unchanged"].append(ident)
         if conflicts:
@@ -205,8 +233,13 @@ def _store_release(summary: ReleaseSummary, shell_map: dict, submodel_map: dict,
                 continue
             _insert_shell(cur, shell, "type", None, None, None)
             summary.shells["created"].append(ident)
-            _outbox(cur, None, "type_shell.published", ident,
-                    {"id": ident, "commons": commons, "sha": sha, "contentSha256": manifest["shells"][ident]})
+            _outbox(
+                cur,
+                None,
+                "type_shell.published",
+                ident,
+                {"id": ident, "commons": commons, "sha": sha, "contentSha256": manifest["shells"][ident]},
+            )
         for ident, submodel in sorted(submodel_map.items()):
             if ident in summary.submodels["unchanged"]:
                 continue
@@ -221,19 +254,30 @@ def _store_release(summary: ReleaseSummary, shell_map: dict, submodel_map: dict,
                 summary.concept_descriptions["unchanged"].append(ident)
                 continue
             if ident in existing_cds:
-                cur.execute("UPDATE concept_descriptions SET doc = %s, content_sha256 = %s, updated_at = now() "
-                            "WHERE id = %s", (json.dumps(cd), digest, ident))
+                cur.execute(
+                    "UPDATE concept_descriptions SET doc = %s, content_sha256 = %s, updated_at = now() WHERE id = %s",
+                    (json.dumps(cd), digest, ident),
+                )
                 summary.concept_descriptions["updated"].append(ident)
             else:
-                cur.execute("INSERT INTO concept_descriptions (id, doc, content_sha256) VALUES (%s, %s, %s)",
-                            (ident, json.dumps(cd), digest))
+                cur.execute(
+                    "INSERT INTO concept_descriptions (id, doc, content_sha256) VALUES (%s, %s, %s)",
+                    (ident, json.dumps(cd), digest),
+                )
                 summary.concept_descriptions["created"].append(ident)
             _outbox(cur, None, "concept_description.changed", ident, {"id": ident, "contentSha256": digest})
 
-        cur.execute("INSERT INTO type_releases (commons, sha, content_sha256, shell_ids) VALUES (%s, %s, %s, %s)",
-                    (commons, sha, release_sha, sorted(shell_map)))
-        _outbox(cur, None, "type_release.published", f"{commons}@{sha}",
-                {"commons": commons, "sha": sha, "contentSha256": release_sha, "shells": sorted(shell_map)})
+        cur.execute(
+            "INSERT INTO type_releases (commons, sha, content_sha256, shell_ids) VALUES (%s, %s, %s, %s)",
+            (commons, sha, release_sha, sorted(shell_map)),
+        )
+        _outbox(
+            cur,
+            None,
+            "type_release.published",
+            f"{commons}@{sha}",
+            {"commons": commons, "sha": sha, "contentSha256": release_sha, "shells": sorted(shell_map)},
+        )
         summary.created = True
     return summary
 
@@ -260,8 +304,9 @@ def publish_instance(tenant: str, body: object) -> tuple[bool, dict]:
         raise conflict("identifier_unavailable", "this instance id is already published") from None
 
 
-def _store_instance(tenant: str, shell: dict, submodels: list[dict], derived: str | None,
-                    publish_sha: str) -> tuple[bool, dict]:
+def _store_instance(
+    tenant: str, shell: dict, submodels: list[dict], derived: str | None, publish_sha: str
+) -> tuple[bool, dict]:
     with db.transaction(tenant) as cur:
         cur.execute("SELECT kind, publish_sha256 FROM shells WHERE id = %s", (shell["id"],))
         row = cur.fetchone()
@@ -273,14 +318,30 @@ def _store_instance(tenant: str, shell: dict, submodels: list[dict], derived: st
             cur.execute("SELECT kind FROM shells WHERE id = %s", (derived,))
             found = cur.fetchone()
             if found is None or found["kind"] != "type":
-                raise unprocessable([Problem("unknown_derived_from", f"type shell '{derived}' is not published",
-                                             "/assetAdministrationShells/0/derivedFrom")])
+                raise unprocessable(
+                    [
+                        Problem(
+                            "unknown_derived_from",
+                            f"type shell '{derived}' is not published",
+                            "/assetAdministrationShells/0/derivedFrom",
+                        )
+                    ]
+                )
         _insert_shell(cur, shell, "instance", tenant, derived, publish_sha)
         for submodel in submodels:
             _insert_submodel(cur, submodel, shell["id"], "instance", tenant)
-        _outbox(cur, tenant, "instance_shell.published", shell["id"],
-                {"id": shell["id"], "derivedFrom": derived, "publishSha256": publish_sha,
-                 "submodels": [s["id"] for s in submodels]})
+        _outbox(
+            cur,
+            tenant,
+            "instance_shell.published",
+            shell["id"],
+            {
+                "id": shell["id"],
+                "derivedFrom": derived,
+                "publishSha256": publish_sha,
+                "submodels": [s["id"] for s in submodels],
+            },
+        )
     return True, _instance_body(shell["id"], publish_sha)
 
 
@@ -296,7 +357,7 @@ def _instance_body(shell_id: str, publish_sha: str) -> dict:
 def _parse_event_body(body: object) -> tuple[str, str, dict]:
     problems: list[Problem] = []
     if not isinstance(body, dict):
-        raise unprocessable([Problem("body", "the body is {\"eventId\", \"submodelIdShort\", \"event\"}", "/")])
+        raise unprocessable([Problem("body", 'the body is {"eventId", "submodelIdShort", "event"}', "/")])
     unknown = sorted(set(body) - {"eventId", "submodelIdShort", "event"})
     if unknown:
         problems.append(Problem("body", f"unknown members: {', '.join(unknown)}", "/"))
@@ -305,8 +366,9 @@ def _parse_event_body(body: object) -> tuple[str, str, dict]:
         if not isinstance(event_id, str) or str(uuid.UUID(event_id)) != event_id:
             raise ValueError
     except ValueError:
-        problems.append(Problem("event_id", "eventId is a lower-case canonical UUID chosen by the publisher",
-                                "/eventId"))
+        problems.append(
+            Problem("event_id", "eventId is a lower-case canonical UUID chosen by the publisher", "/eventId")
+        )
     target = body.get("submodelIdShort")
     if not isinstance(target, str) or not _RE_ID_SHORT.match(target):
         problems.append(Problem("submodel", "submodelIdShort names a submodel of the instance", "/submodelIdShort"))
@@ -354,11 +416,21 @@ def _store_event(tenant: str, isid: InstanceShellId, event_id: str, target: str,
             raise not_found(f"The instance has no submodel '{target}'")
         submodel = sm_row["doc"]
         events = next((e for e in submodel.get("submodelElements", []) if e.get("idShort") == EVENTS_LIST), None)
-        if (events is None or events.get("modelType") != "SubmodelElementList"
-                or events.get("typeValueListElement") != "SubmodelElementCollection"):
-            raise unprocessable([Problem("no_events_list", f"submodel '{target}' has no top-level "
-                                         f"SubmodelElementList '{EVENTS_LIST}' of SubmodelElementCollection",
-                                         "/submodelIdShort")])
+        if (
+            events is None
+            or events.get("modelType") != "SubmodelElementList"
+            or events.get("typeValueListElement") != "SubmodelElementCollection"
+        ):
+            raise unprocessable(
+                [
+                    Problem(
+                        "no_events_list",
+                        f"submodel '{target}' has no top-level "
+                        f"SubmodelElementList '{EVENTS_LIST}' of SubmodelElementCollection",
+                        "/submodelIdShort",
+                    )
+                ]
+            )
         position = len(events.get("value", []))
         events.setdefault("value", []).append(event)
         _validated, problems = validate_environment({"submodels": [submodel]}, "/event")
@@ -378,9 +450,19 @@ def _store_event(tenant: str, isid: InstanceShellId, event_id: str, target: str,
         )
         cur.execute("SELECT received_at FROM passport_events WHERE event_id = %s", (event_id,))
         received = cur.fetchone()["received_at"]
-        _outbox(cur, tenant, "passport_event.appended", shell_id,
-                {"shell": shell_id, "submodel": submodel_id, "eventId": event_id, "position": position,
-                 "contentSha256": digest})
+        _outbox(
+            cur,
+            tenant,
+            "passport_event.appended",
+            shell_id,
+            {
+                "shell": shell_id,
+                "submodel": submodel_id,
+                "eventId": event_id,
+                "position": position,
+                "contentSha256": digest,
+            },
+        )
     return True, _event_body(event_id, submodel_id, position, digest, received)
 
 

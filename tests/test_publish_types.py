@@ -47,8 +47,12 @@ def test_formatting_only_differences_are_a_noop(client, auth_header):
 
 def test_new_release_reuses_unchanged_shells(client, auth_header):
     assert put(client, auth_header, {"environments": [solid_type_env()]}).status_code == 201
-    second = put(client, auth_header, {"environments": [solid_type_env(), material_type_env()]},
-                 url=f"/madfam/v1/type-environments/solid-hyperobjects/{COMMONS_SHA_2}")
+    second = put(
+        client,
+        auth_header,
+        {"environments": [solid_type_env(), material_type_env()]},
+        url=f"/madfam/v1/type-environments/solid-hyperobjects/{COMMONS_SHA_2}",
+    )
     assert second.status_code == 201
     body = second.json()
     assert len(body["shells"]["unchanged"]) == 1 and len(body["shells"]["created"]) == 1
@@ -66,8 +70,12 @@ def test_shell_content_is_immutable_per_id(client, auth_header):
     assert put(client, auth_header, {"environments": [solid_type_env()]}).status_code == 201
     changed = solid_type_env()
     changed["submodels"][0]["submodelElements"][1]["value"] = "Someone Else"
-    response = put(client, auth_header, {"environments": [changed]},
-                   url=f"/madfam/v1/type-environments/solid-hyperobjects/{COMMONS_SHA_2}")
+    response = put(
+        client,
+        auth_header,
+        {"environments": [changed]},
+        url=f"/madfam/v1/type-environments/solid-hyperobjects/{COMMONS_SHA_2}",
+    )
     assert response.status_code == 409
     assert codes(response) == ["immutable"]
 
@@ -76,8 +84,12 @@ def test_concept_description_update_is_allowed(client, auth_header):
     assert put(client, auth_header, {"environments": [solid_type_env()]}).status_code == 201
     env = solid_type_env()
     env["conceptDescriptions"][0]["description"][0]["text"] = "revised definition"
-    response = put(client, auth_header, {"environments": [env]},
-                   url=f"/madfam/v1/type-environments/solid-hyperobjects/{COMMONS_SHA_2}")
+    response = put(
+        client,
+        auth_header,
+        {"environments": [env]},
+        url=f"/madfam/v1/type-environments/solid-hyperobjects/{COMMONS_SHA_2}",
+    )
     assert response.status_code == 201
     assert response.json()["conceptDescriptions"]["updated"] == ["https://id.madfam.io/concept/parameter"]
 
@@ -94,34 +106,86 @@ def test_duplicate_ids_with_different_content_are_rejected(client, auth_header):
     ("mutate", "code", "path_fragment"),
     [
         (lambda e: e["assetAdministrationShells"][0].update(id="https://example.org/aas/1"), "id_scheme", "/id"),
-        (lambda e: e["assetAdministrationShells"][0]["assetInformation"].update(assetKind="Instance"),
-         "asset_kind", "assetKind"),
-        (lambda e: e["assetAdministrationShells"][0]["assetInformation"].update(
-            globalAssetId="https://id.madfam.io/asset/solid/other"), "id_scheme", "globalAssetId"),
-        (lambda e: e["assetAdministrationShells"][0]["assetInformation"]["specificAssetIds"].pop(2),
-         "asset_ids", "specificAssetIds"),
-        (lambda e: e["assetAdministrationShells"][0]["assetInformation"]["specificAssetIds"][0].update(
-            value="soft-hyperobjects"), "asset_ids", "specificAssetIds"),
-        (lambda e: e["assetAdministrationShells"][0]["assetInformation"]["specificAssetIds"][1].update(
-            value="other-slug"), "asset_ids", "specificAssetIds"),
-        (lambda e: e["assetAdministrationShells"][0]["assetInformation"]["specificAssetIds"][2].update(
-            value="0" * 64), "asset_ids", "specificAssetIds"),
-        (lambda e: e["assetAdministrationShells"][0]["assetInformation"]["specificAssetIds"].append(
-            {"name": "slug", "value": "fan-duct"}), "asset_ids", "specificAssetIds"),
-        (lambda e: e["assetAdministrationShells"][0].update(
-            derivedFrom={"type": "ModelReference", "keys": [{"type": "AssetAdministrationShell",
-                                                              "value": "https://id.madfam.io/aas/solid/x/0000000000000000"}]}),
-         "derived_from", "derivedFrom"),
+        (
+            lambda e: e["assetAdministrationShells"][0]["assetInformation"].update(assetKind="Instance"),
+            "asset_kind",
+            "assetKind",
+        ),
+        (
+            lambda e: e["assetAdministrationShells"][0]["assetInformation"].update(
+                globalAssetId="https://id.madfam.io/asset/solid/other"
+            ),
+            "id_scheme",
+            "globalAssetId",
+        ),
+        (
+            lambda e: e["assetAdministrationShells"][0]["assetInformation"]["specificAssetIds"].pop(2),
+            "asset_ids",
+            "specificAssetIds",
+        ),
+        (
+            lambda e: e["assetAdministrationShells"][0]["assetInformation"]["specificAssetIds"][0].update(
+                value="soft-hyperobjects"
+            ),
+            "asset_ids",
+            "specificAssetIds",
+        ),
+        (
+            lambda e: e["assetAdministrationShells"][0]["assetInformation"]["specificAssetIds"][1].update(
+                value="other-slug"
+            ),
+            "asset_ids",
+            "specificAssetIds",
+        ),
+        (
+            lambda e: e["assetAdministrationShells"][0]["assetInformation"]["specificAssetIds"][2].update(
+                value="0" * 64
+            ),
+            "asset_ids",
+            "specificAssetIds",
+        ),
+        (
+            lambda e: e["assetAdministrationShells"][0]["assetInformation"]["specificAssetIds"].append(
+                {"name": "slug", "value": "fan-duct"}
+            ),
+            "asset_ids",
+            "specificAssetIds",
+        ),
+        (
+            lambda e: e["assetAdministrationShells"][0].update(
+                derivedFrom={
+                    "type": "ModelReference",
+                    "keys": [
+                        {
+                            "type": "AssetAdministrationShell",
+                            "value": "https://id.madfam.io/aas/solid/x/0000000000000000",
+                        }
+                    ],
+                }
+            ),
+            "derived_from",
+            "derivedFrom",
+        ),
         (lambda e: e["submodels"][0].update(idShort="Typeplate"), "id_scheme", "/submodels/0/idShort"),
-        (lambda e: e["submodels"][0].update(id="https://id.madfam.io/sm/solid/fan-duct/Nameplate"), "id_scheme",
-         "/submodels/0/id"),
+        (
+            lambda e: e["submodels"][0].update(id="https://id.madfam.io/sm/solid/fan-duct/Nameplate"),
+            "id_scheme",
+            "/submodels/0/id",
+        ),
         (lambda e: e["submodels"].pop(0), "dangling_reference", "/environments/0"),
         (lambda e: e["assetAdministrationShells"][0]["submodels"].pop(0), "orphan_submodel", "/submodels/0/id"),
-        (lambda e: e["conceptDescriptions"][0].update(id="https://example.org/cd/1"), "id_scheme",
-         "/conceptDescriptions/0/id"),
-        (lambda e: e["assetAdministrationShells"][0]["submodels"].append(
-            {"type": "ModelReference", "keys": [{"type": "AssetAdministrationShell", "value": "urn:x"}]}),
-         "reference", "/submodels/"),
+        (
+            lambda e: e["conceptDescriptions"][0].update(id="https://example.org/cd/1"),
+            "id_scheme",
+            "/conceptDescriptions/0/id",
+        ),
+        (
+            lambda e: e["assetAdministrationShells"][0]["submodels"].append(
+                {"type": "ModelReference", "keys": [{"type": "AssetAdministrationShell", "value": "urn:x"}]}
+            ),
+            "reference",
+            "/submodels/",
+        ),
     ],
 )
 def test_sem1_rules_reject_with_paths(client, auth_header, mutate, code, path_fragment):
@@ -150,8 +214,12 @@ def test_submodel_outside_shell_namespace_and_shared_reference(client, auth_head
 
 def test_material_kind_not_allowed_for_unknown_commons_kind(client, auth_header):
     env = solid_type_env()
-    response = put(client, auth_header, {"environments": [env]},
-                   url=f"/madfam/v1/type-environments/soft-hyperobjects/{COMMONS_SHA}")
+    response = put(
+        client,
+        auth_header,
+        {"environments": [env]},
+        url=f"/madfam/v1/type-environments/soft-hyperobjects/{COMMONS_SHA}",
+    )
     assert response.status_code == 422
     assert "id_scheme" in codes(response) and "asset_ids" in codes(response)
 
@@ -225,8 +293,9 @@ def test_body_limits_and_media_type(client, auth_header, monkeypatch):
     try:
         big = put(client, auth_header, {"environments": [solid_type_env()]})
         assert big.status_code == 413 and codes(big) == ["too_large"]
-        streamed = client.put(URL, content=iter([b"[" + b" " * 100, b"]"]),
-                              headers={**headers, "Content-Type": "application/json"})
+        streamed = client.put(
+            URL, content=iter([b"[" + b" " * 100, b"]"]), headers={**headers, "Content-Type": "application/json"}
+        )
         assert streamed.status_code == 413
     finally:
         monkeypatch.delenv("MAX_PUBLISH_BYTES")
@@ -243,9 +312,11 @@ def test_type_rows_are_immutable_even_for_the_owner(client, auth_header, migrate
         assert conn.execute("UPDATE submodels SET id_short = 'x'").rowcount == 0
         conn.rollback()
         # Layer 2: the triggers refuse even when the owner lifts FORCE inside a transaction.
-        for table, statement in (("shells", "UPDATE shells SET id_short = 'x'"),
-                                 ("submodels", "UPDATE submodels SET id_short = 'x'"),
-                                 ("shells", "DELETE FROM shells")):
+        for table, statement in (
+            ("shells", "UPDATE shells SET id_short = 'x'"),
+            ("submodels", "UPDATE submodels SET id_short = 'x'"),
+            ("shells", "DELETE FROM shells"),
+        ):
             conn.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
             with pytest.raises(psycopg.errors.RestrictViolation):
                 conn.execute(statement)

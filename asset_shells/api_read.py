@@ -75,8 +75,13 @@ def _asset_pairs(asset_ids: list[str] | None) -> list[tuple[str, str]]:
             decoded = _decode_json_param(encoded, "assetIds")
             items = decoded if isinstance(decoded, list) else [decoded]
             for item in items:
-                if not (isinstance(item, dict) and isinstance(item.get("name"), str)
-                        and isinstance(item.get("value"), str) and item["name"] and item["value"]):
+                if not (
+                    isinstance(item, dict)
+                    and isinstance(item.get("name"), str)
+                    and isinstance(item.get("value"), str)
+                    and item["name"]
+                    and item["value"]
+                ):
                     raise bad_request("bad_parameter", "each assetId is a JSON object with string name and value")
                 pairs.append((item["name"], item["value"]))
     return pairs
@@ -171,7 +176,9 @@ def get_shell_reference(aasIdentifier: str, principal: Principal | None = Depend
     operation_id="GetAssetInformation_AasRepository",
     tags=[SHELLS_TAG],
 )
-def get_asset_information(aasIdentifier: str, principal: Principal | None = Depends(optional_principal)) -> JSONResponse:  # noqa: N803
+def get_asset_information(
+    aasIdentifier: str, principal: Principal | None = Depends(optional_principal)
+) -> JSONResponse:  # noqa: N803
     shell_id = _decode_id(aasIdentifier, "aasIdentifier")
     with db.transaction(_tenant_for(principal, shell_id)) as cur:
         shell = _shell_or_404(cur, shell_id)
@@ -381,9 +388,10 @@ def get_submodel(
     return _json(views.apply_modifiers(submodel, level, extent))
 
 
-@router.get("/submodels/{submodelIdentifier}/$metadata", operation_id="GetSubmodelById-Metadata",
-            tags=[SUBMODELS_TAG])
-def get_submodel_metadata(submodelIdentifier: str, principal: Principal | None = Depends(optional_principal)) -> JSONResponse:  # noqa: N803
+@router.get("/submodels/{submodelIdentifier}/$metadata", operation_id="GetSubmodelById-Metadata", tags=[SUBMODELS_TAG])
+def get_submodel_metadata(
+    submodelIdentifier: str, principal: Principal | None = Depends(optional_principal)
+) -> JSONResponse:  # noqa: N803
     sm_id = _decode_id(submodelIdentifier, "submodelIdentifier")
     with db.transaction(_tenant_for(principal, sm_id)) as cur:
         submodel = _submodel_or_404(cur, sm_id)
@@ -404,17 +412,21 @@ def get_submodel_value(
     return _json(views.submodel_value(submodel, level, extent))
 
 
-@router.get("/submodels/{submodelIdentifier}/$reference", operation_id="GetSubmodelById-Reference",
-            tags=[SUBMODELS_TAG])
-def get_submodel_reference(submodelIdentifier: str, principal: Principal | None = Depends(optional_principal)) -> JSONResponse:  # noqa: N803
+@router.get(
+    "/submodels/{submodelIdentifier}/$reference", operation_id="GetSubmodelById-Reference", tags=[SUBMODELS_TAG]
+)
+def get_submodel_reference(
+    submodelIdentifier: str, principal: Principal | None = Depends(optional_principal)
+) -> JSONResponse:  # noqa: N803
     sm_id = _decode_id(submodelIdentifier, "submodelIdentifier")
     with db.transaction(_tenant_for(principal, sm_id)) as cur:
         submodel = _submodel_or_404(cur, sm_id)
     return _json(views.submodel_reference(submodel["id"]))
 
 
-@router.get("/submodels/{submodelIdentifier}/submodel-elements", operation_id="GetAllSubmodelElements",
-            tags=[SUBMODELS_TAG])
+@router.get(
+    "/submodels/{submodelIdentifier}/submodel-elements", operation_id="GetAllSubmodelElements", tags=[SUBMODELS_TAG]
+)
 def get_submodel_elements(
     submodelIdentifier: str,  # noqa: N803
     limit: int | None = Query(None, ge=1),
@@ -486,8 +498,9 @@ def lookup_shells(
     return _json(page.body())
 
 
-@router.post("/lookup/shellsByAssetLink", operation_id="SearchAllAssetAdministrationShellIdsByAssetLink",
-             tags=[DISCOVERY_TAG])
+@router.post(
+    "/lookup/shellsByAssetLink", operation_id="SearchAllAssetAdministrationShellIdsByAssetLink", tags=[DISCOVERY_TAG]
+)
 async def search_shells_by_asset_link(
     request: Request,
     limit: int | None = Query(None, ge=1),

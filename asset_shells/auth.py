@@ -63,9 +63,7 @@ def signing_key_for(token: str, kid: str):
             raise jwt.InvalidKeyError("unknown kid")
         return _local_keys[kid].key
     if _jwks_client is None:
-        _jwks_client = jwt.PyJWKClient(
-            s.effective_jwks_url, cache_keys=True, lifespan=s.jwks_cache_seconds, timeout=5
-        )
+        _jwks_client = jwt.PyJWKClient(s.effective_jwks_url, cache_keys=True, lifespan=s.jwks_cache_seconds, timeout=5)
     return _jwks_client.get_signing_key(kid).key
 
 
