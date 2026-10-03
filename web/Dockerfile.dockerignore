@@ -1,0 +1,6 @@
+# BuildKit reads this file instead of the root .dockerignore when it builds web/Dockerfile.
+# The root file excludes web/ (the API image never needs it); the landing build needs exactly
+# these two files and nothing else from the repo.
+*
+!web/Caddyfile
+!web/index.html
