@@ -11,7 +11,7 @@ Read this before touching the repo. Every agent commit ends with
 ## What asset-shells is
 
 The MADFAM ecosystem's store for Asset Administration Shell documents (Digital Twins MES programme,
-Phase 3; contract SEM-1 §6). Owner decisions of 2026-10-02: codename `asset-shells`; permanent ids under
+Phase 3; contract SEM-1 §6), and its twin graph (Phase 4; ASM-1 §6). Owner decisions of 2026-10-02: codename `asset-shells`; permanent ids under
 `https://id.madfam.io/`; type shells are public read; PUBLIC repository under AGPL-3.0-only; landing at
 `asset-shells.madfam.io`, API at `asset-shells-api.madfam.io`.
 
@@ -33,7 +33,12 @@ Phase 3; contract SEM-1 §6). Owner decisions of 2026-10-02: codename `asset-she
    service profile in code, docs, the landing or `/description` (which is deliberately not implemented).
 5. **Logs carry no database detail.** Database errors are logged as class + SQLSTATE only
    (`describe_db_error`); `DbErrorScrubFilter` strips anything else. `tests/test_ops.py` pins it.
-6. **Small footprint.** Pool max 4 (the shared Postgres has 100 connections fleet-wide); no pip in the
+6. **The keystone decides assemblies (ASM-1 §6).** An assembly shell is stored only if the pinned
+   `hyperobjects-spec` validator passes it against the type shells stored here AND the published shell and
+   submodels are exactly its projection; graph edges are read from that verified content in the same
+   transaction. Never add an assembly rule here that belongs in the keystone, and never accept edges a
+   publisher sends separately.
+7. **Small footprint.** Pool max 4 (the shared Postgres has 100 connections fleet-wide); no pip in the
    runtime image; read-only root filesystem.
 
 ## What asset-shells does not own
@@ -48,14 +53,20 @@ this service makes none).
 
 - `asset_shells/app.py` — FastAPI app, `/health`, `/ready` (real DB round-trip + schema revision), request log.
 - `asset_shells/api_read.py` — Part 2 read routes at `/api/v3.1` (official operationIds).
-- `asset_shells/api_publish.py` — `/madfam/v1` publish routes; `publish.py` — transactional writes + outbox.
+- `asset_shells/api_publish.py` — `/madfam/v1` publish routes; `publish.py` — transactional writes + outbox
+  + graph edges.
+- `asset_shells/api_graph.py` — `GET /madfam/v1/graph` and `/assemblies/{assetId}/validation`;
+  `graph.py` — edge extraction and the recursive-CTE walk; `assemblies.py` — the keystone seam (type
+  assembly re-validation, instance-assembly matching).
 - `asset_shells/validation.py` — the two gates; `scheme.py` — SEM-1 rules; `ids.py` — id scheme, base64url.
 - `asset_shells/views.py` — level/extent, Value-Only, `$metadata`, idShortPath resolution.
 - `asset_shells/repository.py` — read queries and cursor pagination; `db.py` — pool, tenant transaction,
   role posture check, bounded startup retry; `auth.py` — token verification; `logging.py` — JSON logs + scrub.
 - `asset_shells/migrations/` — Alembic (run as the owner by `asset-shells migrate`), RLS policies, triggers, grants.
 - `asset_shells/schemas/` — the vendored official JSON Schema (CC-BY-4.0, NOTICE).
-- `tests/` — fixtures in SEM-1 shapes (`aas_fixtures.py`), tenancy proofs, contract tests
+- `tests/` — fixtures in SEM-1 shapes (`aas_fixtures.py`), assemblies A and B built with the pinned keystone
+  from byte-identical commons copies (`assembly_fixtures.py`, `fixtures/assembly-commons`), the twin-graph
+  suite (`test_twin_graph.py`), tenancy proofs, contract tests
   (`contract/specs` = official OpenAPI, CC-BY-4.0), publish/read/auth/ops/manifest suites.
 - `web/` — the landing (static, Caddy, non-root). `infra/k8s/production/` — Deployments, Services,
   NetworkPolicies, kustomization with placeholder digests. `enclii.yaml` — project + two services.
