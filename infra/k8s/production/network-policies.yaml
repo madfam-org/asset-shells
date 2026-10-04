@@ -1,0 +1,116 @@
+---
+# Default deny for every asset-shells pod; then: the tunnel may reach the API (8000) and the landing
+# (8080); the API may reach DNS, the data namespace (Postgres and its pooler) and 443 (Janua JWKS).
+# The landing has no egress beyond DNS. Peers use one selector each (k3s combined-selector deny).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: asset-shells
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: asset-shells
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cloudflared-to-api
+  namespace: asset-shells
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: asset-shells-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cloudflare-tunnel
+      ports:
+        - protocol: TCP
+          port: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cloudflared-to-web
+  namespace: asset-shells
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: asset-shells-web
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cloudflare-tunnel
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: asset-shells
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: asset-shells
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-data-egress
+  namespace: asset-shells
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: asset-shells-api
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: data
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-https-egress
+  namespace: asset-shells
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: asset-shells-api
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443

@@ -1,0 +1,75 @@
+[project]
+name = "asset-shells"
+version = "0.1.0"
+description = "asset-shells — MADFAM's store and read API for Asset Administration Shell documents (type shells, instance shells, product passports)"
+readme = "README.md"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
+classifiers = [
+  "License :: OSI Approved :: GNU Affero General Public License v3",
+  "Programming Language :: Python :: 3.13",
+  "Framework :: FastAPI",
+]
+requires-python = ">=3.13,<3.14"
+# Runtime dependencies. Every licence is AGPL-3.0-compatible (scripts/check-licenses.sh enforces the
+# allowlist in CI). SQLAlchemy arrives only through Alembic; it is used with an explicit
+# `postgresql+psycopg` URL, so the SQLAlchemy 2.1 default-driver change does not affect us.
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "pydantic>=2.10,<3",
+  "pydantic-settings>=2.7,<3",
+  "psycopg[binary,pool]>=3.2,<4",
+  "alembic>=1.14,<2",
+  "pyjwt[crypto]>=2.10,<3",
+  "basyx-python-sdk==2.2.0",
+  "jsonschema>=4.23,<5",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "pytest-cov>=6",
+  "httpx>=0.28",
+  "ruff>=0.9",
+  "pip-licenses>=5",
+  "pyyaml>=6",
+]
+
+[project.scripts]
+asset-shells = "asset_shells.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["asset_shells"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = ["tests/contract/specs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "BLE"]
+ignore = [
+  "S101",  # assert is the pytest idiom; production code does not use it for control flow
+]
+
+[tool.ruff.lint.per-file-ignores]
+"asset_shells/api_*.py" = ["B008"]  # FastAPI Depends()/Query() in defaults is the framework idiom
+"tests/*" = ["S105", "S106", "S108", "S311", "S603", "S607", "BLE001"]
+"asset_shells/migrations/*" = ["S608"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+source = ["asset_shells"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

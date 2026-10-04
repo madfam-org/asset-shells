@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>asset-shells — expedientes AAS de los diseños MADFAM</title>
+<meta name="description" content="asset-shells guarda y sirve documentos Asset Administration Shell (AAS) para los diseños abiertos de MADFAM y para las piezas fabricadas con ellos. Software libre AGPL-3.0.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23233a52'/%3E%3Crect x='16' y='16' width='32' height='32' rx='4' fill='none' stroke='%23f2e3c6' stroke-width='5'/%3E%3Crect x='26' y='26' width='12' height='12' fill='%23f2e3c6'/%3E%3C/svg%3E">
+<style>
+  :root { --bg:#f6f5f1; --ink:#1b1c1e; --muted:#55585e; --line:#d9d6cc; --accent:#233a52; --accent-ink:#f2e3c6; --card:#ffffff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#13161b; --ink:#eceae4; --muted:#a7a9ad; --line:#2a2f37; --accent:#a9c4de; --accent-ink:#101722; --card:#1a1e25; } }
+  * { box-sizing:border-box }
+  html { color-scheme: light dark }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; }
+  a { color:inherit }
+  .skip { position:absolute; left:-999px } .skip:focus { left:1rem; top:1rem; background:var(--card); padding:.5rem 1rem; z-index:9 }
+  header, main, footer { max-width:60rem; margin:0 auto; padding:0 1rem }
+  header { padding-top:2.5rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap }
+  .brand { font-weight:700; letter-spacing:.02em; font-size:1.25rem }
+  .brand small { display:block; font-weight:400; color:var(--muted); font-size:.85rem }
+  nav { display:flex; flex-wrap:wrap; gap:.3rem 1rem }
+  nav a { white-space:nowrap; text-decoration:none; color:var(--muted) } nav a:hover, nav a:focus { color:var(--ink); text-decoration:underline }
+  .hero { padding:3rem 0 2.25rem; border-bottom:1px solid var(--line) }
+  .hero h1 { font-size:clamp(1.8rem, 4vw, 2.6rem); line-height:1.15; margin:0 0 1rem; max-width:34ch }
+  .hero p { font-size:1.1rem; max-width:62ch; color:var(--muted) }
+  .pill { display:inline-block; padding:.2rem .7rem; border:1px solid var(--line); border-radius:999px; font-size:.8rem; color:var(--muted); margin-bottom:1rem }
+  section { padding:2.25rem 0; border-bottom:1px solid var(--line) }
+  h2 { font-size:1.35rem; margin:0 0 1rem }
+  .grid { display:grid; gap:1rem; grid-template-columns:repeat(auto-fit, minmax(15rem, 1fr)) }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1.1rem 1.2rem }
+  .card h3 { margin:0 0 .4rem; font-size:1.05rem }
+  .card p { margin:0; color:var(--muted); font-size:.95rem }
+  pre { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1rem; overflow-x:auto; font-size:.85rem; line-height:1.45 }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap:anywhere }
+  table { width:100%; border-collapse:collapse; font-size:.92rem }
+  th, td { text-align:left; padding:.45rem .5rem; border-bottom:1px solid var(--line); vertical-align:top }
+  .table-wrap { overflow-x:auto }
+  .cta { display:inline-block; background:var(--accent); color:var(--accent-ink); padding:.7rem 1.1rem; border-radius:10px; text-decoration:none; font-weight:600 }
+  .cta:focus-visible, a:focus-visible { outline:3px solid var(--accent); outline-offset:3px }
+  footer { padding:2rem 1rem 3rem; color:var(--muted); font-size:.9rem }
+  ul.plain { padding-left:1.2rem } ul.plain li { margin:.35rem 0 }
+  .en { border-left:3px solid var(--line); padding-left:1rem; color:var(--muted) }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Saltar al contenido</a>
+<header>
+  <div class="brand">asset-shells<small>expedientes AAS · MADFAM</small></div>
+  <nav aria-label="Secciones"><a href="#que-hace">Qué hace</a><a href="#api">API</a><a href="#ids">Identificadores</a><a href="#estado">Estado</a><a href="https://github.com/madfam-org/asset-shells">Código</a></nav>
+</header>
+<main id="main">
+  <section class="hero" aria-labelledby="h1">
+    <span class="pill">v1 · en desarrollo · AGPL-3.0</span>
+    <h1 id="h1">Un expediente digital para cada diseño abierto de MADFAM y para cada pieza fabricada con él.</h1>
+    <p>asset-shells guarda y sirve documentos <em>Asset Administration Shell</em> (AAS, metamodelo v3.1): uno por cada revisión de un diseño de los commons de MADFAM —cartuchos sólidos, prendas y fichas de material— y uno por cada pieza que se fabrica a partir de ellos, con su pasaporte de producto. Los expedientes de diseño son públicos; los de piezas fabricadas pertenecen a la organización que las fabricó.</p>
+    <p class="en">In English: asset-shells stores and serves Asset Administration Shell documents (metamodel v3.1) — one per revision of each MADFAM commons design (solid cartridges, garments, material cards) and one per part made from them, with its product passport. Design shells are public; shells of manufactured parts belong to the organisation that made them.</p>
+  </section>
+
+  <section id="que-hace" aria-labelledby="h-que">
+    <h2 id="h-que">Qué hace</h2>
+    <div class="grid">
+      <div class="card"><h3>Expedientes de tipo (públicos)</h3><p>Uno por revisión de diseño, inmutable: su identificador lleva el resumen del árbol del diseño. Contienen placa de datos, modelo paramétrico, interfaces de acoplamiento y lista de materiales cuando el diseño los declara.</p></div>
+      <div class="card"><h3>Expedientes de instancia (privados)</h3><p>Uno por pieza fabricada, publicado por el sistema de fabricación de la organización. Solo esa organización puede leerlo; las demás no pueden ni saber que existe.</p></div>
+      <div class="card"><h3>Pasaporte de producto</h3><p>Eventos que solo se anexan: una corrección es un evento nuevo, nunca una edición. La base de datos rechaza modificaciones y borrados.</p></div>
+      <div class="card"><h3>Validación en cada escritura</h3><p>Cada documento pasa el esquema JSON oficial de AAS v3.1.2 y el decodificador estricto del SDK BaSyx para Python, además de las reglas de identificadores de MADFAM. Un rechazo dice qué falló y dónde.</p></div>
+    </div>
+  </section>
+
+  <section id="api" aria-labelledby="h-api">
+    <h2 id="h-api">Cómo se consulta</h2>
+    <p>Lectura en <code>/api/v3.1</code>: un subconjunto de las operaciones de lectura de la especificación IDTA-01002 v3.1 (repositorio de AAS, repositorio de submodelos y búsqueda por identificador de activo). Cada operación implementada se prueba contra el documento OpenAPI oficial; las que no están en la lista no existen todavía. No afirmamos conformidad con ningún perfil completo.</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th scope="col">Ruta</th><th scope="col">Devuelve</th></tr></thead>
+      <tbody>
+        <tr><td><code>GET /shells</code> · <code>/shells/{id}</code></td><td>Expedientes, con filtros <code>assetIds</code> e <code>idShort</code> y paginación por cursor</td></tr>
+        <tr><td><code>GET /submodels</code> · <code>/submodels/{id}</code></td><td>Submodelos, con filtro <code>semanticId</code>; también <code>$value</code>, <code>$metadata</code>, <code>$reference</code></td></tr>
+        <tr><td><code>GET /submodels/{id}/submodel-elements/{idShortPath}</code></td><td>Un elemento por ruta (<code>a.b[0].c</code>) o su valor con <code>/$value</code></td></tr>
+        <tr><td><code>GET /lookup/shells</code></td><td>Identificadores de expedientes por identificador de activo</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>Los identificadores van en la ruta codificados en base64url sin relleno, como pide la especificación:</p>
+<pre><code># ejemplo / example
+ID=$(printf '%s' 'https://id.madfam.io/aas/solid/&lt;slug&gt;/&lt;16-hex&gt;' | base64 | tr '+/' '-_' | tr -d '=\n')
+curl -s "https://asset-shells-api.madfam.io/api/v3.1/shells/$ID"</code></pre>
+    <p>Publicación en <code>/madfam/v1</code>: solo clientes de servicio de MADFAM con un token RS256 emitido por Janua y el alcance correspondiente. No hay cuentas de usuario.</p>
+  </section>
+
+  <section id="ids" aria-labelledby="h-ids">
+    <h2 id="h-ids">Identificadores permanentes</h2>
+    <ul class="plain">
+      <li>Diseño: <code>https://id.madfam.io/asset/{solid|soft}/{slug}</code></li>
+      <li>Expediente de una revisión: <code>https://id.madfam.io/aas/{solid|soft}/{slug}/{16 hex del árbol}</code></li>
+      <li>Ficha de material: <code>https://id.madfam.io/aas/material/{slug}/{16 hex del contenido}</code></li>
+      <li>Pieza fabricada: <code>https://id.madfam.io/aas/instance/{uuid}</code></li>
+      <li>Conceptos del léxico: <code>https://id.madfam.io/concept/{término}</code></li>
+    </ul>
+  </section>
+
+  <section id="estado" aria-labelledby="h-est">
+    <h2 id="h-est">Estado</h2>
+    <p>La versión 1 está en desarrollo y todavía no está en servicio en <code>asset-shells-api.madfam.io</code>. Lo que existe hoy: el servicio, sus pruebas (incluido el aislamiento entre organizaciones) y esta página. Siguen la publicación automática desde los commons y los avisos de cambios a suscriptores.</p>
+    <p class="en">Status: version 1 is in development and not yet serving at asset-shells-api.madfam.io. What exists today is the service, its tests (tenant isolation included) and this page.</p>
+    <p style="margin-top:1.5rem"><a class="cta" href="https://github.com/madfam-org/asset-shells">Ver el código en GitHub</a></p>
+  </section>
+</main>
+<footer>
+  <p>asset-shells es software libre bajo la licencia <a href="https://www.gnu.org/licenses/agpl-3.0.html">GNU AGPL-3.0</a>. Parte del ecosistema <a href="https://madfam.io">MADFAM</a>. Esta página no usa cookies ni recopila datos.</p>
+</footer>
+</body>
+</html>

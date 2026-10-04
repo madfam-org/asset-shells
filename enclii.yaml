@@ -1,0 +1,151 @@
+# Enclii manifest — asset-shells, MADFAM's Asset Administration Shell store (Digital Twins MES
+# programme, Phase 3; owner decisions 2026-10-02: codename asset-shells, ids under id.madfam.io,
+# type shells publicly readable).
+#
+# Two services:
+#   asset-shells      the API at asset-shells-api.madfam.io. Public on purpose: type shells describe
+#                     public CERN-OHL-W designs and are readable anonymously; instance shells and
+#                     passports require a Janua service token and are tenant-scoped by row-level
+#                     security. Writes require publish scopes.
+#   asset-shells-web  the landing at asset-shells.madfam.io (static, Caddy, non-root).
+#
+# Managed Postgres is provisioned AT onboard (onboard is not idempotent). The addon's credentials
+# own the schema and are used ONLY by the migrate init container; the API connects as a separate
+# non-owner role (APP_DATABASE_URL) — see docs/operator-setup.md. The pool is small (max 4) because
+# the shared Postgres serves the whole fleet.
+#
+# Nothing here deploys by itself: there is no build-and-deploy workflow in this repository yet.
+apiVersion: enclii.dev/v1
+kind: Project
+metadata:
+  name: asset-shells
+spec:
+  # Manual promotion: the service holds other organisations' manufacturing records.
+  promotion:
+    pattern: manual
+    min_soak_minutes: 15
+    require_smoke_pass: true
+---
+apiVersion: enclii.dev/v1
+kind: Service
+metadata:
+  name: asset-shells
+  project: asset-shells
+  description: asset-shells API — AAS type shells (public), instance shells and product passports (tenant-scoped)
+spec:
+  status:
+    enabled: true
+    entries:
+      - name: asset-shells (API)
+        url: https://asset-shells-api.madfam.io/health
+        href: https://asset-shells.madfam.io
+        group: Platform
+        family: MADFAM Platform
+        description: Asset Administration Shell store — read API and publish API
+
+  build:
+    type: dockerfile
+    dockerfile: Dockerfile
+    context: .
+    source:
+      git:
+        repository: https://github.com/madfam-org/asset-shells
+        branch: main
+        autoDeploy: false
+
+  runtime:
+    port: 8000
+    replicas: 1
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "1000m"
+        memory: "768Mi"
+    healthCheck: /health
+    healthCheckTimeoutSeconds: 3
+
+  domains:
+    - name: asset-shells-api.madfam.io
+      environment: production
+      tlsEnabled: true
+
+  addons:
+    - type: postgres
+      name: asset-shells-db
+
+  slo:
+    availability: 99.5
+    latencyP99Ms: 2000
+
+  # Ingress only through the tunnel. Egress: DNS, the data namespace (Postgres / pooler), and 443
+  # for Janua's JWKS (https://auth.madfam.io/.well-known/jwks.json).
+  network:
+    services:
+      - name: asset-shells
+        port: 8000
+        ingress: [cloudflare-tunnel]
+        egress: [dns, postgres, https]
+
+  dependencies:
+    - platform: janua
+      reason: identity — RS256 service tokens (audience asset-shells-api, scopes asset-shells:*), JWKS
+    - platform: enclii
+      reason: deploy, managed Postgres addon, secrets intake
+---
+apiVersion: enclii.dev/v1
+kind: Service
+metadata:
+  name: asset-shells-web
+  project: asset-shells
+  description: asset-shells landing — static page (Caddy, non-root)
+spec:
+  status:
+    enabled: true
+    entries:
+      - name: asset-shells (landing)
+        url: https://asset-shells.madfam.io/health
+        href: https://asset-shells.madfam.io
+        group: Platform
+        family: MADFAM Platform
+        description: Asset Administration Shell store — landing page
+
+  build:
+    type: dockerfile
+    dockerfile: web/Dockerfile
+    context: .
+    source:
+      git:
+        repository: https://github.com/madfam-org/asset-shells
+        branch: main
+        autoDeploy: false
+
+  runtime:
+    port: 8080
+    replicas: 1
+    resources:
+      requests:
+        cpu: "10m"
+        memory: "32Mi"
+      limits:
+        cpu: "200m"
+        memory: "64Mi"
+    healthCheck: /health
+    healthCheckTimeoutSeconds: 3
+
+  domains:
+    - name: asset-shells.madfam.io
+      environment: production
+      tlsEnabled: true
+
+  slo:
+    availability: 99.5
+    latencyP99Ms: 500
+
+  network:
+    services:
+      - name: asset-shells-web
+        port: 8080
+        ingress: [cloudflare-tunnel]
+        egress: [dns]
