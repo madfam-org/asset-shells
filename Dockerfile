@@ -11,6 +11,9 @@ ARG PYTHON_IMAGE=python:3.13-slim
 
 FROM ${PYTHON_IMAGE} AS build
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONDONTWRITEBYTECODE=1
+# git fetches the keystone (hyperobjects-spec), pinned by commit SHA in pyproject.toml. Build stage only: the
+# runtime stage below copies the virtualenv and has neither git nor pip.
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 RUN python -m venv /opt/venv
 COPY pyproject.toml README.md LICENSE ./

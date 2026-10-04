@@ -24,11 +24,14 @@ ID_SHORT = r"[a-zA-Z][a-zA-Z0-9_-]*[a-zA-Z0-9_]+"
 CONCEPT_TERM = r"[a-z0-9][a-z0-9_.-]*"
 
 DESIGN_KINDS = ("solid", "soft")
-TYPE_KINDS = ("solid", "soft", "material")
+#: Type-level assemblies (ASM-1 §5): authored in the solid commons, named by their assembly digest.
+ASSEMBLY_KIND = "assembly"
+TYPE_KINDS = ("solid", "soft", "material", ASSEMBLY_KIND)
+_KINDS = "|".join(TYPE_KINDS)
 
-_RE_TYPE_SHELL = re.compile(rf"^{re.escape(ID_BASE)}aas/(solid|soft|material)/({SLUG})/({HEX16})$")
-_RE_TYPE_ASSET = re.compile(rf"^{re.escape(ID_BASE)}asset/(solid|soft|material)/({SLUG})$")
-_RE_TYPE_SUBMODEL = re.compile(rf"^{re.escape(ID_BASE)}sm/(solid|soft|material)/({SLUG})/({HEX16})/({ID_SHORT})$")
+_RE_TYPE_SHELL = re.compile(rf"^{re.escape(ID_BASE)}aas/({_KINDS})/({SLUG})/({HEX16})$")
+_RE_TYPE_ASSET = re.compile(rf"^{re.escape(ID_BASE)}asset/({_KINDS})/({SLUG})$")
+_RE_TYPE_SUBMODEL = re.compile(rf"^{re.escape(ID_BASE)}sm/({_KINDS})/({SLUG})/({HEX16})/({ID_SHORT})$")
 _RE_INSTANCE_SHELL = re.compile(rf"^{re.escape(ID_BASE)}aas/instance/({UUID})$")
 _RE_INSTANCE_ASSET = re.compile(rf"^{re.escape(ID_BASE)}asset/instance/({UUID})$")
 _RE_INSTANCE_SUBMODEL = re.compile(rf"^{re.escape(ID_BASE)}sm/instance/({UUID})/({ID_SHORT})$")
@@ -39,9 +42,10 @@ _RE_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _RE_TENANT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
 
 # Which kinds of type shell each commons may publish. Material cards travel with the commons
-# whose platform owns them (yantra4d → solid, fashion-cabinet → soft).
+# whose platform owns them (yantra4d → solid, fashion-cabinet → soft); assemblies live in the solid
+# commons (`assemblies/{slug}/assembly.json`, ASM-1 §7).
 COMMONS_KINDS: dict[str, frozenset[str]] = {
-    "solid-hyperobjects": frozenset({"solid", "material"}),
+    "solid-hyperobjects": frozenset({"solid", "material", ASSEMBLY_KIND}),
     "soft-hyperobjects": frozenset({"soft", "material"}),
 }
 

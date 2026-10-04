@@ -53,6 +53,9 @@ class ApiError(Exception):
     status: int
     problems: list[Problem] = field(default_factory=list)
     headers: dict[str, str] | None = None
+    #: Extra members merged into the Result body (e.g. ``assemblyReports`` on an assembly 422). Part 2 clients
+    #: ignore members they do not know.
+    extra: dict | None = None
 
     @classmethod
     def one(cls, status: int, code: str, text: str, path: str | None = None, headers: dict | None = None) -> ApiError:
@@ -79,8 +82,8 @@ def conflict(code: str, text: str, path: str | None = None) -> ApiError:
     return ApiError.one(409, code, text, path)
 
 
-def unprocessable(problems: list[Problem]) -> ApiError:
-    return ApiError(422, problems)
+def unprocessable(problems: list[Problem], extra: dict | None = None) -> ApiError:
+    return ApiError(422, problems, extra=extra)
 
 
 def result_body(problems: list[Problem], correlation_id: str) -> dict:
@@ -94,9 +97,10 @@ def _correlation_id(request: Request) -> str:
 def install_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def _api_error(request: Request, exc: ApiError) -> JSONResponse:
-        return JSONResponse(
-            result_body(exc.problems, _correlation_id(request)), status_code=exc.status, headers=exc.headers
-        )
+        body = result_body(exc.problems, _correlation_id(request))
+        if exc.extra:
+            body.update(exc.extra)
+        return JSONResponse(body, status_code=exc.status, headers=exc.headers)
 
     @app.exception_handler(RequestValidationError)
     async def _validation(request: Request, exc: RequestValidationError) -> JSONResponse:

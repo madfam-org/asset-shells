@@ -30,6 +30,8 @@ thumbnails, `$path`, and the `$metadata`/`$value`/`$reference` variants not list
 | **Type shells** — one per design revision (solid cartridge, garment) or material card; immutable | the platforms (yantra4d, fashion-cabinet) with `asset-shells:publish-types` | everyone, anonymously |
 | **Instance shells** — one per manufactured part (`derivedFrom` its type shell) | pravara-mes with `asset-shells:publish-instances` and an organisation-bound token | the same organisation only (`asset-shells:read`) |
 | **Passport events** — appended to a list in an instance submodel; append-only | as above | as above |
+| **Assembly shells** — one per assembly digest (ASM-1 §5), re-validated by the keystone before they are stored | as type shells (solid commons) | everyone, anonymously |
+| **Twin-graph edges** (`asset_edges`) — `has_part`, `mates_with`, `derived_from` between assets, written with each publish; append-only | derived from what is published, never sent separately | type edges everyone; instance edges the same organisation only |
 
 ## Read API — `/api/v3.1`
 
@@ -98,10 +100,57 @@ carries the design-revision digest); concept descriptions may change with the le
 is appended to the top-level `Events` SubmodelElementList (of SubmodelElementCollection, no idShort on
 items) of the named instance submodel, then the whole submodel is re-validated.
 
+An **assembly** environment (shell `aas/assembly/{slug}/{digest16}`, published in a `solid-hyperobjects`
+release) passes a third gate, the pinned keystone (`hyperobjects-spec`, ASM-1 §6):
+
+1. its document is read back from the `AssemblyDocument` Blob;
+2. every cartridge component is resolved from the **stored** type shell its BillOfMaterials node names
+   (`DerivedFrom`: `ParametricModel`, `GeometryProvision`, `MatingInterfaces`, `RequirementProfile`), or
+   from a shell published in the same request; standard parts from the catalog bundled with the pinned
+   keystone; external designs from their inline facts;
+3. `validate_assembly` runs: an unresolved component or any failing check (mating rule, closure of every
+   mate, reachability) is a **422 whose body adds `assemblyReports`** — the keystone's full report
+   (components, placements, every mate with its residuals, errors);
+4. the published shell and submodels must be exactly the keystone's projection of that document and
+   report (same digest, BoM, mates, placements), else a 422 naming the submodel that differs.
+
+So publishers must build assembly environments with the **same keystone pin** as this service (the solid
+commons' `SPEC_PIN`); a different projection is refused rather than stored.
+
+An **instance assembly** (Phase 5: `POST /instances` with `derivedFrom` a type assembly shell) must match
+its type: its `BillOfMaterials` EntryNode (the instance asset) holds one entity per type component
+(`ComponentId`), each with a HSEBoM `HasPart` from the EntryNode; a cartridge component names an instance
+asset of the same organisation whose shell is `derivedFrom` the type component's revision; a standard or
+external component names the type's asset (or URL). Otherwise 422.
+
 Every write passes two gates before anything is stored: the official AAS v3.1.2 JSON Schema (vendored in
 `asset_shells/schemas`, with attributes the metamodel does not define rejected) and the BaSyx Python SDK
 2.2.0 strict decoder; then the identifier rules of SEM-1 §1. Rejections are `Result` objects whose
 messages carry a JSON-pointer `path` into the request body. The document is stored as published.
+
+## Twin graph — `/madfam/v1` (ASM-1 §6)
+
+| Route | Who | Result |
+|---|---|---|
+| `GET /graph?root={assetId}&direction=down\|up&depth=1..8&kinds=has_part,mates_with,derived_from,same_as` | anyone (type graph); `asset-shells:read` + `tenant_id` adds that tenant's instance graph | `{root, direction, depth, kinds, nodes: [{assetId, depth, shells}], edges: [{from, to, kind, depth, instance, viaShellId, viaSubmodelId, props}], truncated}` / 400 / 401 / 403 / 404 |
+| `GET /assemblies/{assetId}/validation[?revision={digest16}]` | anyone for a type assembly; `asset-shells:read` + `tenant_id` for an instance assembly | the keystone's verdict re-run now over the stored shells: `{assetId, shellId, revisions, ok, keystone, problems, report}`; for an instance also `{instance: {ok, problems}, type: {…}}` / 404 |
+
+`assetId` is UTF8-BASE64-URL-encoded as in Part 2; `root` also accepts a plain `https://…` IRI. Defaults:
+`direction=down`, `depth=1`, every kind. The walk is one recursive CTE over `asset_edges` (one row per asset
+and depth, so cycles of mates cost at most `depth` rows per asset), at most 5000 edges (`truncated` says
+when it stopped). Row-level security decides what it sees, exactly as for shells: another organisation's
+instance is a 404.
+
+Edges, written in the same transaction as the publish that carries them (a replay writes none):
+
+| Kind | From → to | Read from |
+|---|---|---|
+| `has_part` | the nearest asset on the `first` path → the `second` entity's `globalAssetId` (an external design: its `Url`) | every HSEBoM `HasPart` of a `BillOfMaterials` submodel |
+| `mates_with` | component a's asset → component b's asset; `props` = the mate's annotations (interfaces, rotation, residuals, `validated`) | an assembly's `Mates` submodel; an instance assembly gets its type's mates mapped onto its components |
+| `derived_from` | instance asset → its type asset (`props.typeShell` = the exact revision) | an instance shell's `derivedFrom` |
+| `same_as` | reserved | — |
+
+A cartridge component's `has_part` edge carries `props.typeShell`, the revision it was resolved at.
 
 ## Identifiers (SEM-1 §1)
 
@@ -112,6 +161,9 @@ messages carry a JSON-pointer `path` into the request body. The document is stor
 | Type submodel | `https://id.madfam.io/sm/{solid\|soft}/{slug}/{tree16}/{SubmodelIdShort}` |
 | Material card asset / shell | `https://id.madfam.io/asset/material/{slug}` / `https://id.madfam.io/aas/material/{slug}/{content16}` |
 | Material submodel (not in SEM-1 §1; analogous, accepted) | `https://id.madfam.io/sm/material/{slug}/{content16}/{SubmodelIdShort}` |
+| Assembly asset / shell (ASM-1 §5) | `https://id.madfam.io/asset/assembly/{slug}` / `https://id.madfam.io/aas/assembly/{slug}/{digest16}` (specificAssetIds `commons`, `slug`, `assembly_digest`) |
+| Assembly submodel | `https://id.madfam.io/sm/assembly/{slug}/{digest16}/{SubmodelIdShort}` |
+| Standard (COTS) part asset | `https://id.madfam.io/asset/standard/{key}` (no shell is stored for it; it is a graph node) |
 | Instance asset / shell | `https://id.madfam.io/asset/instance/{uuid}` / `https://id.madfam.io/aas/instance/{uuid}` |
 | Instance submodel | `https://id.madfam.io/sm/instance/{uuid}/{SubmodelIdShort}` |
 | Concept description | `https://id.madfam.io/concept/{term}` or, for a submodel template, `https://id.madfam.io/smt/{template}/{major}/{minor}` |
@@ -125,8 +177,8 @@ messages carry a JSON-pointer `path` into the request body. The document is stor
   get 401, tokens without the scope or tenant 403, and another tenant's instance 404.
 - The database enforces the same: the runtime role is not the owner, every tenant-bearing table has
   `FORCE ROW LEVEL SECURITY`, each transaction sets one setting (`app.tenant_id`, transaction-local),
-  composite foreign keys pin child rows to their shell's tenant, and triggers make shells and type
-  submodels immutable and passport events append-only. The service refuses to start if its database role
+  composite foreign keys pin child rows (including graph edges) to their shell's tenant, and triggers make
+  shells and type submodels immutable and passport events and graph edges append-only. The service refuses to start if its database role
   owns tables, is a superuser or bypasses RLS.
 
 ## Local development
@@ -170,7 +222,16 @@ The database tests ERROR (they are never skipped) when the two URLs are missing.
 | `MAX_PUBLISH_BYTES` | 33554432 | env |
 | `ASSET_SHELLS_ENV`, `JWKS_PATH` | `production`, — | `JWKS_PATH` only in `local`/`test` |
 
+## Dependencies of note
+
+- **`hyperobjects-spec`** (the keystone, Apache-2.0), pinned by full commit SHA in `pyproject.toml`: the
+  assembly validator, the AAS projection and the stored-shell resolver run here exactly as in the commons
+  CI. Repin it together with the solid commons' `SPEC_PIN`. The image's build stage installs `git` to fetch
+  it; the runtime image has no git and no pip.
+
 ## Third-party material
 
 - `asset_shells/schemas/aas-v3.1.2.json` — IDTA, CC-BY-4.0 (see the NOTICE next to it).
 - `tests/contract/specs/` — IDTA-01002 v3.1.3 OpenAPI documents, CC-BY-4.0 (see the README there).
+- `tests/fixtures/assembly-commons/` — assemblies A and B and their nine cartridges, byte-identical copies
+  from the solid commons, CERN-OHL-W-2.0, test inputs only (`tests/fixtures/NOTICE-assembly-commons.md`).

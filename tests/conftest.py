@@ -31,7 +31,7 @@ APP_URL_ENV = "ASSET_SHELLS_TEST_APP_URL"
 ISSUER = "https://auth.madfam.io"
 AUDIENCE = "asset-shells-api"
 KID = "test-key-1"
-TABLES = "outbox, passport_events, type_releases, concept_descriptions, asset_ids, submodels, shells"
+TABLES = "asset_edges, outbox, passport_events, type_releases, concept_descriptions, asset_ids, submodels, shells"
 
 TENANT_A = "org-tenant-a"
 TENANT_B = "org-tenant-b"
