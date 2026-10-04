@@ -233,5 +233,5 @@ The database tests ERROR (they are never skipped) when the two URLs are missing.
 
 - `asset_shells/schemas/aas-v3.1.2.json` — IDTA, CC-BY-4.0 (see the NOTICE next to it).
 - `tests/contract/specs/` — IDTA-01002 v3.1.3 OpenAPI documents, CC-BY-4.0 (see the README there).
-- `tests/fixtures/assembly-commons/` — assemblies A and B and their eight cartridges, byte-identical copies
+- `tests/fixtures/assembly-commons/` — assemblies A and B and their nine cartridges, byte-identical copies
   from the solid commons, CERN-OHL-W-2.0, test inputs only (`tests/fixtures/NOTICE-assembly-commons.md`).

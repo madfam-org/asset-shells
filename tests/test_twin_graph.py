@@ -80,25 +80,25 @@ def test_assemblies_publish_after_their_components_with_edges(published, admin_c
     assert sorted(published["shells"]["created"]) == sorted(
         [f"{BASE}aas/assembly/{A}/{DIGESTS[A][:16]}", f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}"]
     )
-    # A: 15 components + 15 mates; B: 12 + 12.
-    assert published["edges"] == 15 + 15 + 12 + 12
+    # A: 15 components + 15 mates; B: 13 + 13.
+    assert published["edges"] == 15 + 15 + 13 + 13
     rows = admin_conn.execute(
         "SELECT kind, count(*), bool_and(tenant_id IS NULL) FROM asset_edges GROUP BY kind ORDER BY kind"
     ).fetchall()
-    assert rows == [("has_part", 27, True), ("mates_with", 27, True)]
+    assert rows == [("has_part", 28, True), ("mates_with", 28, True)]
 
 
 def test_a_replayed_release_writes_no_edges(published, client, auth_header, admin_conn):
     again = put_release(client, auth_header, [assembly_env(A), assembly_env(B)], COMMONS_SHA_2)
     assert again.status_code == 200 and again.json()["edges"] == 0
-    assert admin_conn.execute("SELECT count(*) FROM asset_edges").fetchone()[0] == 54
+    assert admin_conn.execute("SELECT count(*) FROM asset_edges").fetchone()[0] == 56
 
 
 def test_components_and_assembly_in_one_release(client, auth_header):
     envs = [*cartridge_envs().values(), assembly_env(B)]
     response = put_release(client, auth_header, envs)
     assert response.status_code == 201, response.text
-    assert response.json()["edges"] == 24
+    assert response.json()["edges"] == 26
 
 
 def test_an_assembly_before_its_components_is_422_with_the_report(client, auth_header, admin_conn):
@@ -116,6 +116,7 @@ def test_an_assembly_before_its_components_is_422_with_the_report(client, auth_h
         "pod_rr",
         "fc_standoffs",
         "battery_pad",
+        "camera_cage",
     }
     assert admin_conn.execute("SELECT count(*) FROM shells").fetchone()[0] == 0  # nothing written
 
@@ -133,16 +134,16 @@ def test_a_failing_assembly_is_422_with_the_closure_report(client, auth_header):
     assert put_release(client, auth_header, list(cartridge_envs().values())).status_code == 201
 
     def wrong_angle(doc):
-        doc["mates"][-1]["angle_deg"] = 40  # the camera's closing mate, against the geometry
+        doc["mates"][11]["angle_deg"] = 40  # the cage's closing ear mate, against the geometry
 
     response = put_release(client, auth_header, [_with_document(assembly_env(B), wrong_angle)], COMMONS_SHA_2)
     assert response.status_code == 422
     (report,) = response.json()["assemblyReports"]
     (error,) = report["report"]["errors"]
-    assert error["code"] == "closure" and error["subject"] == "camera_on_right_plate"
-    assert "stated angle_deg 40° but the geometry realises 30°" in error["message"]
-    closing = next(m for m in report["report"]["mates"] if m["mate"] == "camera_on_right_plate")
-    assert closing["ok"] is False and closing["x_axis_deg"] == pytest.approx(10)
+    assert error["code"] == "closure" and error["subject"] == "cage_ear_right_on_plate"
+    assert "stated angle_deg 40° but the geometry realises 0°" in error["message"]
+    closing = next(m for m in report["report"]["mates"] if m["mate"] == "cage_ear_right_on_plate")
+    assert closing["ok"] is False and closing["x_axis_deg"] == pytest.approx(40)
 
 
 def test_a_published_projection_that_disagrees_with_its_document_is_422(client, auth_header):
@@ -197,9 +198,9 @@ def test_down_from_the_fpv_frame_follows_its_mates(published, client):
     body = graph(client, FRAME, direction="down", depth=1, kinds="mates_with").json()
     targets = sorted(t for _f, t, _k in edge_set(body))
     assert targets.count(POD) == 4
-    assert f"{BASE}asset/standard/fpv-camera-micro-19mm" in targets
-    camera = [e for e in body["edges"] if e["props"]["mateId"].startswith("camera_on")]
-    assert {e["props"]["angleDeg"] for e in camera} == {"-30", "30"}
+    assert targets.count(f"{BASE}asset/solid/fpv-camera-cage") == 2  # both ears, on the outer faces
+    ears = [e for e in body["edges"] if e["props"]["mateId"].startswith("cage_ear")]
+    assert {e["props"]["angleDeg"] for e in ears} == {"0"}
     deeper = graph(client, FRAME, direction="down", depth=2, kinds="mates_with").json()
     assert sorted(t for _f, t, _k in edge_set(deeper) if _f == POD) == [MOTOR] * 4
     assert {n["assetId"]: n["depth"] for n in deeper["nodes"]}[MOTOR] == 2
@@ -225,7 +226,7 @@ def test_graph_parameters_are_validated(published, client):
     assert client.get("/madfam/v1/graph", params={"root": "%%%"}).status_code == 400
     assert graph(client, f"{BASE}asset/assembly/no-such-thing").status_code == 404
     plain = client.get("/madfam/v1/graph", params={"root": ASSET_B})
-    assert plain.status_code == 200 and len(plain.json()["edges"]) == 12
+    assert plain.status_code == 200 and len(plain.json()["edges"]) == 13
 
 
 # ── the validation endpoint ──────────────────────────────────────────────────
@@ -236,7 +237,7 @@ def test_validation_of_a_stored_type_assembly(published, client):
     assert body["ok"] is True and body["problems"] == []
     assert body["shellId"] == f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}"
     assert body["report"]["digest"] == DIGESTS[B]
-    assert len(body["report"]["mates"]) == 12 and all(m["ok"] for m in body["report"]["mates"])
+    assert len(body["report"]["mates"]) == 13 and all(m["ok"] for m in body["report"]["mates"])
     assert body["keystone"]
     by_revision = client.get(f"/madfam/v1/assemblies/{enc(ASSET_B)}/validation", params={"revision": DIGESTS[B][:16]})
     assert by_revision.status_code == 200
@@ -291,8 +292,8 @@ def test_an_instance_assembly_matches_its_type_and_gets_edges(published, client,
         derived = admin_conn.execute(
             "SELECT count(*) FROM asset_edges WHERE tenant_id = %s AND kind = 'derived_from'", (TENANT_A,)
         ).fetchone()[0]
-    assert rows == [("derived_from", 1), ("has_part", 12), ("mates_with", 12)]
-    assert derived == 7  # six component instances + the assembly
+    assert rows == [("derived_from", 1), ("has_part", 13), ("mates_with", 13)]
+    assert derived == 8  # seven component instances + the assembly
 
 
 def test_an_instance_assembly_missing_a_component_is_422(published, client, auth_header):
@@ -360,9 +361,9 @@ def test_db_edges_are_filtered_and_checked(app_conn):
     app_conn, shell_a = app_conn
     _as(app_conn, TENANT_B)
     assert app_conn.execute("SELECT count(*) FROM asset_edges WHERE tenant_id IS NOT NULL").fetchone()[0] == 0
-    assert app_conn.execute("SELECT count(*) FROM asset_edges").fetchone()[0] == 54  # the type graph only
+    assert app_conn.execute("SELECT count(*) FROM asset_edges").fetchone()[0] == 56  # the type graph only
     _as(app_conn, TENANT_A)
-    assert app_conn.execute("SELECT count(*) FROM asset_edges WHERE via_shell_id = %s", (shell_a,)).fetchone()[0] == 25
+    assert app_conn.execute("SELECT count(*) FROM asset_edges WHERE via_shell_id = %s", (shell_a,)).fetchone()[0] == 27
     _as(app_conn, TENANT_B)
     with pytest.raises(psycopg.errors.InsufficientPrivilege):  # an edge written for another tenant
         app_conn.execute(

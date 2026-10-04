@@ -22,7 +22,9 @@ A = "voron-2-4-class-350-motion-frame"
 B = "fpv-5in-freestyle"
 DIGESTS = {
     A: "58caf08106856e9e98d670bc522cbc7f5cc92ddb0d1b40927c34a36181476ad8",
-    B: "96a7e42d30a9778ea9238e6d307419e88e9cebfa1dabf17594257c3323d4af47",
+    # B with the camera cage (solid #136, 13 mates) on this keystone's catalog; f0db7bdb… at the commons'
+    # SPEC_PIN 8c12194, before hyperobjects-spec#41 changed the fpv-frame entry, whose digest enters B's identity.
+    B: "96166430930bbe5817f394ef382221f257f0f2de20b67cb38bec02c142e8f23c",
 }
 CARTRIDGES = (
     "tslot-corner",
@@ -33,6 +35,7 @@ CARTRIDGES = (
     "motor-soft-mount",
     "pcb-standoff",
     "battery-pad",
+    "fpv-camera-cage",
 )
 BASE = "https://id.madfam.io/"
 HAS_PART = "https://admin-shell.io/idta/HierarchicalStructures/HasPart/1/0"
