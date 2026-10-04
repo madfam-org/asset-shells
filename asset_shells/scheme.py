@@ -5,7 +5,9 @@ Type environments (``PUT /madfam/v1/type-environments/{commons}/{sha}``):
   commons may publish; ``assetKind`` = Type; ``globalAssetId`` = ``…/asset/{kind}/{slug}``;
   no ``derivedFrom`` (SEM-1 §5);
 * design shells (solid/soft) carry the specificAssetIds ``commons`` (= the path commons), ``slug``
-  (= the id slug) and ``tree_sha256`` (64 hex, starting with the id's hex16);
+  (= the id slug) and ``tree_sha256`` (64 hex, starting with the id's hex16); assembly shells
+  (ASM-1 §5, solid commons only) carry ``commons``, ``slug`` and ``assembly_digest`` likewise, and are
+  re-validated by the keystone before they are stored (``assemblies.py``);
 * every submodel id is ``…/sm/{kind}/{slug}/{hex16}/{SubmodelIdShort}`` with ``SubmodelIdShort`` equal
   to the submodel's idShort, is referenced by exactly one shell of the same design revision, and every
   reference resolves inside the environment;
@@ -25,8 +27,8 @@ from __future__ import annotations
 
 from .errors import Problem
 from .ids import (
+    ASSEMBLY_KIND,
     COMMONS_KINDS,
-    DESIGN_KINDS,
     InstanceShellId,
     TypeShellId,
     instance_submodel_parts,
@@ -37,6 +39,9 @@ from .ids import (
     parse_type_shell_id,
     type_submodel_parts,
 )
+
+#: The specificAssetId that carries each kind's full revision digest (its shell id holds 16 hex).
+REVISION_DIGEST = {"solid": "tree_sha256", "soft": "tree_sha256", ASSEMBLY_KIND: "assembly_digest"}
 
 
 def _submodel_ref_ids(shell: dict, base: str, problems: list[Problem]) -> list[str]:
@@ -90,21 +95,24 @@ def _check_type_shell(shell: dict, tsid: TypeShellId, commons: str, base: str, p
                 )
             )
     path = f"{base}/assetInformation/specificAssetIds"
-    required = ("commons", "slug", "tree_sha256") if tsid.kind in DESIGN_KINDS else ()
+    digest_name = REVISION_DIGEST.get(tsid.kind)
+    required = ("commons", "slug", digest_name) if digest_name else ()
     for name in required:
         if name not in specific:
-            problems.append(Problem("asset_ids", f"design shells carry the specificAssetId '{name}' (SEM-1 §5)", path))
+            problems.append(
+                Problem("asset_ids", f"{tsid.kind} shells carry the specificAssetId '{name}' (SEM-1/ASM-1 §5)", path)
+            )
     if "commons" in specific and specific["commons"][0] != commons:
         problems.append(Problem("asset_ids", f"specificAssetId 'commons' must be '{commons}'", path))
     if "slug" in specific and specific["slug"][0] != tsid.slug:
         problems.append(Problem("asset_ids", f"specificAssetId 'slug' must be '{tsid.slug}'", path))
-    if "tree_sha256" in specific:
-        tree = specific["tree_sha256"][0]
-        if not is_sha256(tree) or not tree.startswith(tsid.digest16):
+    if digest_name and digest_name in specific:
+        digest = specific[digest_name][0]
+        if not is_sha256(digest) or not digest.startswith(tsid.digest16):
             problems.append(
                 Problem(
                     "asset_ids",
-                    "specificAssetId 'tree_sha256' must be 64 lower-case hex starting "
+                    f"specificAssetId '{digest_name}' must be 64 lower-case hex starting "
                     "with the shell id's 16-hex digest",
                     path,
                 )

@@ -31,7 +31,7 @@ TENANT_SETTING = "app.tenant_id"
 _pool: ConnectionPool | None = None
 
 # The migration's head revision; /ready fails while the schema is older or newer than the code.
-EXPECTED_SCHEMA_REVISION = "0001_initial"
+EXPECTED_SCHEMA_REVISION = "0002_twin_graph"
 
 
 class DatabaseUnavailable(RuntimeError):

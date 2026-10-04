@@ -1,5 +1,7 @@
 """Writes: type releases, instance shells, passport events. Each one is a single transaction that
-also writes its outbox rows, so a change and its notification commit or roll back together.
+also writes its outbox rows and its twin-graph edges (``asset_edges``, ASM-1 §6), so a change, its
+notification and its edges commit or roll back together. Assembly shells are re-validated by the pinned
+keystone before anything is written (``assemblies.py``).
 
 Idempotency and immutability:
 * A type release ``(commons, sha)`` is immutable: re-sending the same content is a no-op (200);
@@ -19,7 +21,7 @@ from dataclasses import dataclass, field
 
 import psycopg
 
-from . import db
+from . import assemblies, db, graph
 from .errors import ApiError, Problem, bad_request, conflict, not_found, unprocessable
 from .ids import COMMONS_KINDS, ID_SHORT, InstanceShellId, is_commit_sha
 from .repository import GLOBAL_ASSET_ID, canonical_reference
@@ -119,6 +121,7 @@ class ReleaseSummary:
     concept_descriptions: dict[str, list[str]] = field(
         default_factory=lambda: {"created": [], "updated": [], "unchanged": []}
     )
+    edges: int = 0
 
     def body(self) -> dict:
         return {
@@ -129,6 +132,7 @@ class ReleaseSummary:
             "shells": self.shells,
             "submodels": self.submodels,
             "conceptDescriptions": self.concept_descriptions,
+            "edges": self.edges,
         }
 
 
@@ -173,6 +177,10 @@ def publish_type_release(commons: str, sha: str, body: object) -> ReleaseSummary
     for shell in shell_map.values():
         for ref in shell.get("submodels", []):
             owner[ref["keys"][0]["value"]] = shell["id"]
+    bundles = {
+        ident: (shell, [submodel_map[ref["keys"][0]["value"]] for ref in shell.get("submodels", [])])
+        for ident, shell in shell_map.items()
+    }
     manifest = {
         "shells": {k: content_sha256(v) for k, v in sorted(shell_map.items())},
         "submodels": {k: content_sha256(v) for k, v in sorted(submodel_map.items())},
@@ -181,13 +189,36 @@ def publish_type_release(commons: str, sha: str, body: object) -> ReleaseSummary
     release_sha = content_sha256(manifest)
     summary = ReleaseSummary(commons, sha, release_sha, created=False)
     try:
-        return _store_release(summary, shell_map, submodel_map, cd_map, owner, manifest)
+        return _store_release(summary, shell_map, submodel_map, cd_map, owner, manifest, bundles)
     except psycopg.errors.UniqueViolation:
         raise conflict("concurrent_publish", "a concurrent publish wrote the same identifiers; retry") from None
 
 
+def _check_assemblies(cur, created: list[str], bundles: dict[str, tuple[dict, list[dict]]]) -> None:
+    """ASM-1 §6: every assembly shell this release creates passes the keystone against the stored type shells
+    (and the ones this release carries), and is exactly the keystone's projection. Otherwise a 422 with the
+    reports, and the transaction (nothing written yet) rolls back."""
+    pending = {ident: (shell, {sm["idShort"]: sm for sm in sms}) for ident, (shell, sms) in bundles.items()}
+    fetch = assemblies.type_fetcher(cur, pending)
+    checks = [
+        assemblies.check_type_assembly(bundles[ident][0], bundles[ident][1], fetch, f"/shells/{ident}")
+        for ident in created
+        if assemblies.is_assembly_shell(ident)
+    ]
+    failed = [c for c in checks if not c.ok]
+    if failed:
+        problems = [p for c in failed for p in c.problems][:MAX_PROBLEMS]
+        raise ApiError(422, problems, extra={"assemblyReports": [c.body() for c in failed]})
+
+
 def _store_release(
-    summary: ReleaseSummary, shell_map: dict, submodel_map: dict, cd_map: dict, owner: dict, manifest: dict
+    summary: ReleaseSummary,
+    shell_map: dict,
+    submodel_map: dict,
+    cd_map: dict,
+    owner: dict,
+    manifest: dict,
+    bundles: dict[str, tuple[dict, list[dict]]],
 ) -> ReleaseSummary:
     commons, sha, release_sha = summary.commons, summary.sha, summary.content_sha256
     with db.transaction(None) as cur:
@@ -227,6 +258,7 @@ def _store_release(
                     bucket["unchanged"].append(ident)
         if conflicts:
             raise ApiError(409, conflicts[:MAX_PROBLEMS])
+        _check_assemblies(cur, [i for i in sorted(shell_map) if i not in summary.shells["unchanged"]], bundles)
 
         for ident, shell in sorted(shell_map.items()):
             if ident in summary.shells["unchanged"]:
@@ -245,6 +277,10 @@ def _store_release(
                 continue
             _insert_submodel(cur, submodel, owner[ident], "type", None)
             summary.submodels["created"].append(ident)
+        # The twin graph (ASM-1 §6), in this same transaction: the edges of every shell this release creates.
+        for ident in summary.shells["created"]:
+            shell, submodels = bundles[ident]
+            summary.edges += graph.insert_edges(cur, ident, None, graph.environment_edges(shell, submodels))
 
         cur.execute("SELECT id, content_sha256 FROM concept_descriptions WHERE id = ANY(%s)", (list(cd_map),))
         existing_cds = {r["id"]: r["content_sha256"] for r in cur.fetchall()}
@@ -314,8 +350,9 @@ def _store_instance(
             if row["kind"] == "instance" and row["publish_sha256"] == publish_sha:
                 return False, _instance_body(shell["id"], publish_sha)
             raise conflict("identifier_unavailable", "this instance id is already published with other content")
+        derived_asset, extra_edges = None, []
         if derived is not None:
-            cur.execute("SELECT kind FROM shells WHERE id = %s", (derived,))
+            cur.execute("SELECT kind, global_asset_id FROM shells WHERE id = %s", (derived,))
             found = cur.fetchone()
             if found is None or found["kind"] != "type":
                 raise unprocessable(
@@ -327,9 +364,17 @@ def _store_instance(
                         )
                     ]
                 )
+            derived_asset = found["global_asset_id"]
+            if assemblies.is_assembly_shell(derived):
+                # ASM-1 §6: an instance assembly matches its type assembly, component by component.
+                type_bundle = assemblies.type_fetcher(cur)(derived)
+                problems, extra_edges = assemblies.check_instance_assembly(cur, shell, submodels, type_bundle)
+                _raise_if(problems)
         _insert_shell(cur, shell, "instance", tenant, derived, publish_sha)
         for submodel in submodels:
             _insert_submodel(cur, submodel, shell["id"], "instance", tenant)
+        edges = graph.environment_edges(shell, submodels, derived_asset) + extra_edges
+        graph.insert_edges(cur, shell["id"], tenant, edges)
         _outbox(
             cur,
             tenant,

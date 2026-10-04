@@ -24,6 +24,10 @@ dependencies = [
   "pyjwt[crypto]>=2.10,<3",
   "basyx-python-sdk==2.2.0",
   "jsonschema>=4.23,<5",
+  # The keystone (Apache-2.0): the assembly validator, the AAS projection and the stored-shell resolver run
+  # here exactly as in the commons CI (ASM-1 §6). Pinned by full commit SHA; repin with the solid commons'
+  # SPEC_PIN. 7e7d789 is the head of hyperobjects-spec#40 until that PR's merge commit replaces it.
+  "hyperobjects-spec @ git+https://github.com/madfam-org/hyperobjects-spec@7e7d7895cf6b21f149e3458665f80f13b0b7d7da",
 ]
 
 [project.optional-dependencies]
@@ -43,13 +47,18 @@ asset-shells = "asset_shells.cli:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.metadata]
+allow-direct-references = true  # the keystone is pinned by commit SHA, not published to an index
+
 [tool.hatch.build.targets.wheel]
 packages = ["asset_shells"]
 
 [tool.ruff]
 line-length = 120
 target-version = "py313"
-extend-exclude = ["tests/contract/specs"]
+# tests/fixtures/assembly-commons: byte-identical CERN-OHL-W cartridges from the solid commons (see
+# tests/fixtures/NOTICE-assembly-commons.md); their tree digests are pinned, so they are never reformatted here.
+extend-exclude = ["tests/contract/specs", "tests/fixtures/assembly-commons"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S", "BLE"]

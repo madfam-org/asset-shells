@@ -80,7 +80,8 @@ jobs:
         # read-only root filesystem.
         run: |
           H="--user 1001 --cap-drop ALL --security-opt no-new-privileges --read-only"
-          docker run --rm $H --tmpfs /tmp asset-shells:ci python -c "import asset_shells.app, basyx.aas; print('import ok')"
+          docker run --rm $H --tmpfs /tmp asset-shells:ci python -c "import asset_shells.app, basyx.aas, hyperobjects_aas.resolver; print('import ok')"
+          docker run --rm $H --tmpfs /tmp asset-shells:ci sh -c '! command -v git' && echo "no git in the runtime image"
           docker run --rm $H --tmpfs /tmp asset-shells:ci sh -c '! python -c "import pip" 2>/dev/null && ! command -v pip' && echo "no pip in the runtime image"
           docker run --rm $H --tmpfs /tmp asset-shells:ci python -m asset_shells.cli --help >/dev/null
           docker run --rm $H --tmpfs /data --tmpfs /config asset-shells-web:ci caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

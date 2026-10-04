@@ -4,6 +4,7 @@
 * ``/ready`` — readiness: a real database round-trip through the pool, and the schema revision the
   code expects. 503 otherwise.
 * ``/openapi.json`` — the service's own OpenAPI document (an MCP surface can be generated from it).
+* ``/madfam/v1/graph`` and ``/madfam/v1/assemblies/{assetId}/validation`` — the twin graph (``api_graph``).
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from . import __version__, db
+from .api_graph import router as graph_router
 from .api_publish import router as publish_router
 from .api_read import router as read_router
 from .errors import install_handlers
@@ -111,6 +113,7 @@ def create_app() -> FastAPI:
 
     app.include_router(read_router)
     app.include_router(publish_router)
+    app.include_router(graph_router)
     return app
 
 
