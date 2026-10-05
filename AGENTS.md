@@ -79,7 +79,8 @@ this service makes none).
 The README's [Related repositories and contracts](README.md#related-repositories-and-contracts)
 section links the keystone documents this service enforces (SEM-1 projection, ASM-1) and the
 repositories that publish to it. A rule about what a valid assembly or shell is belongs in
-the keystone, not here.
+the keystone, not here. The dated status, with the open PRs in merge order and the next keystone
+repin, is [`docs/STATUS.md`](docs/STATUS.md).
 
 ## Working here
 

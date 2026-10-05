@@ -17,7 +17,8 @@ API: <https://asset-shells-api.madfam.io>. Agent rules: [AGENTS.md](./AGENTS.md)
 Version 1, in development, **not deployed**. What exists: the service, its migration, tests (including
 tenant-isolation proofs and contract tests against the official IDTA OpenAPI), the landing page and
 the deployment manifests (with placeholder image digests). There is no build-and-deploy workflow yet;
-deploying is an owner decision (docs/operator-setup.md).
+deploying is an owner decision (docs/operator-setup.md). The dated programme status (what landed, open
+PRs in merge order, next steps) is [`docs/STATUS.md`](docs/STATUS.md); the open-PR list on GitHub is authoritative.
 
 Not in v1: the outbox relay (webhooks/SSE — changes are recorded in the `outbox` table, nothing reads it
 yet), the Concept Description repository read API, `/description`, `/serialization`, attachments and
