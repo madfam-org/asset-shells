@@ -65,11 +65,18 @@ def parameter(param_id: str, default: str, lo: str, hi: str, unit: str) -> dict:
     }
 
 
-def solid_type_env(slug: str = "fan-duct", seed: str = "fan-duct@1.0.0", version: str = "1.0.0") -> dict:
+def projection_ext(projection: int) -> list[dict]:
+    """The shell's ProjectionVersion extension (hyperobjects-spec 0.6.0)."""
+    return [{"name": "ProjectionVersion", "valueType": "xs:positiveInteger", "value": str(projection)}]
+
+
+def solid_type_env(
+    slug: str = "fan-duct", seed: str = "fan-duct@1.0.0", version: str = "1.0.0", projection: int = 1
+) -> dict:
     tree = tree_sha(seed)
     t16 = tree[:16]
-    shell_id = f"{BASE}aas/solid/{slug}/{t16}"
-    sm = f"{BASE}sm/solid/{slug}/{t16}/"
+    shell_id = f"{BASE}aas/solid/{slug}/{t16}/p{projection}"
+    sm = f"{BASE}sm/solid/{slug}/{t16}/p{projection}/"
     major, minor, _patch = version.split(".")
     nameplate = {
         "modelType": "Submodel",
@@ -173,6 +180,7 @@ def solid_type_env(slug: str = "fan-duct", seed: str = "fan-duct@1.0.0", version
     }
     shell = {
         "modelType": "AssetAdministrationShell",
+        "extensions": projection_ext(projection),
         "id": shell_id,
         "idShort": slug,
         "administration": {"version": major, "revision": minor},
@@ -210,12 +218,12 @@ def solid_type_env(slug: str = "fan-duct", seed: str = "fan-duct@1.0.0", version
     }
 
 
-def material_type_env(slug: str = "bambu-tpu-95a", seed: str = "bambu-tpu-95a-card") -> dict:
+def material_type_env(slug: str = "bambu-tpu-95a", seed: str = "bambu-tpu-95a-card", projection: int = 1) -> dict:
     c16 = tree_sha(seed)[:16]
-    shell_id = f"{BASE}aas/material/{slug}/{c16}"
+    shell_id = f"{BASE}aas/material/{slug}/{c16}/p{projection}"
     data = {
         "modelType": "Submodel",
-        "id": f"{BASE}sm/material/{slug}/{c16}/MaterialData",
+        "id": f"{BASE}sm/material/{slug}/{c16}/p{projection}/MaterialData",
         "idShort": "MaterialData",
         "kind": "Instance",
         "semanticId": ext_ref(f"{BASE}smt/material-data/1/0"),
@@ -227,6 +235,7 @@ def material_type_env(slug: str = "bambu-tpu-95a", seed: str = "bambu-tpu-95a-ca
     }
     shell = {
         "modelType": "AssetAdministrationShell",
+        "extensions": projection_ext(projection),
         "id": shell_id,
         "idShort": slug,
         "assetInformation": {

@@ -5,6 +5,11 @@ base64url-encoded WITHOUT padding. Decoding here tolerates missing or present pa
 anything that does not round-trip to valid UTF-8.
 
 SEM-1 §1 (owner ruling 2026-10-02): permanent identifiers are minted under https://id.madfam.io/.
+
+Projection version (owner decision 2026-10-04, hyperobjects-spec 0.6.0): a type shell or submodel id names the
+design revision AND the keystone projection that produced its bytes — ``…/{hex16}/p{N}`` — and the shell records
+``N`` in its ``ProjectionVersion`` extension. Shells stay immutable per id, so a new projection of a stored revision
+is a new shell next to the old one, never a 409. Instance, asset, concept and template ids carry no version.
 """
 
 from __future__ import annotations
@@ -18,6 +23,10 @@ ID_BASE = "https://id.madfam.io/"
 
 SLUG = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 HEX16 = r"[0-9a-f]{16}"
+#: The projection version segment: ``p`` + a positive integer without leading zeros.
+PROJECTION = r"p([1-9][0-9]*)"
+#: The shell extension that records the projection version (hyperobjects-spec 0.6.0).
+PROJECTION_EXTENSION = "ProjectionVersion"
 UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 # AAS v3.1.2 idShort pattern (aas.json): letter first, then letters/digits/_/-, not ending in '-'.
 ID_SHORT = r"[a-zA-Z][a-zA-Z0-9_-]*[a-zA-Z0-9_]+"
@@ -29,9 +38,9 @@ ASSEMBLY_KIND = "assembly"
 TYPE_KINDS = ("solid", "soft", "material", ASSEMBLY_KIND)
 _KINDS = "|".join(TYPE_KINDS)
 
-_RE_TYPE_SHELL = re.compile(rf"^{re.escape(ID_BASE)}aas/({_KINDS})/({SLUG})/({HEX16})$")
+_RE_TYPE_SHELL = re.compile(rf"^{re.escape(ID_BASE)}aas/({_KINDS})/({SLUG})/({HEX16})/{PROJECTION}$")
 _RE_TYPE_ASSET = re.compile(rf"^{re.escape(ID_BASE)}asset/({_KINDS})/({SLUG})$")
-_RE_TYPE_SUBMODEL = re.compile(rf"^{re.escape(ID_BASE)}sm/({_KINDS})/({SLUG})/({HEX16})/({ID_SHORT})$")
+_RE_TYPE_SUBMODEL = re.compile(rf"^{re.escape(ID_BASE)}sm/({_KINDS})/({SLUG})/({HEX16})/{PROJECTION}/({ID_SHORT})$")
 _RE_INSTANCE_SHELL = re.compile(rf"^{re.escape(ID_BASE)}aas/instance/({UUID})$")
 _RE_INSTANCE_ASSET = re.compile(rf"^{re.escape(ID_BASE)}asset/instance/({UUID})$")
 _RE_INSTANCE_SUBMODEL = re.compile(rf"^{re.escape(ID_BASE)}sm/instance/({UUID})/({ID_SHORT})$")
@@ -74,6 +83,8 @@ class TypeShellId:
     kind: str
     slug: str
     digest16: str
+    #: The keystone projection version (``p{N}``) the shell's bytes were projected with.
+    projection: int
 
     @property
     def asset_id(self) -> str:
@@ -81,7 +92,12 @@ class TypeShellId:
 
     @property
     def submodel_prefix(self) -> str:
-        return f"{ID_BASE}sm/{self.kind}/{self.slug}/{self.digest16}/"
+        return f"{ID_BASE}sm/{self.kind}/{self.slug}/{self.digest16}/p{self.projection}/"
+
+    @property
+    def revision(self) -> tuple[str, str, str]:
+        """(kind, slug, digest16): the design revision, whatever the projection version."""
+        return (self.kind, self.slug, self.digest16)
 
 
 @dataclass(frozen=True)
@@ -99,7 +115,7 @@ class InstanceShellId:
 
 def parse_type_shell_id(value: str) -> TypeShellId | None:
     m = _RE_TYPE_SHELL.match(value)
-    return TypeShellId(m.group(1), m.group(2), m.group(3)) if m else None
+    return TypeShellId(m.group(1), m.group(2), m.group(3), int(m.group(4))) if m else None
 
 
 def parse_instance_shell_id(value: str) -> InstanceShellId | None:
@@ -107,10 +123,19 @@ def parse_instance_shell_id(value: str) -> InstanceShellId | None:
     return InstanceShellId(m.group(1)) if m else None
 
 
-def type_submodel_parts(value: str) -> tuple[str, str, str, str] | None:
-    """(kind, slug, digest16, idShort) of a type submodel id, or None."""
+def type_submodel_parts(value: str) -> tuple[str, str, str, int, str] | None:
+    """(kind, slug, digest16, projection, idShort) of a type submodel id, or None."""
     m = _RE_TYPE_SUBMODEL.match(value)
-    return (m.group(1), m.group(2), m.group(3), m.group(4)) if m else None
+    return (m.group(1), m.group(2), m.group(3), int(m.group(4)), m.group(5)) if m else None
+
+
+def shell_projection_version(shell: dict) -> int | None:
+    """The projection version a shell states in its ``ProjectionVersion`` extension, or None."""
+    for ext in shell.get("extensions") or []:
+        if isinstance(ext, dict) and ext.get("name") == PROJECTION_EXTENSION:
+            value = ext.get("value")
+            return int(value) if isinstance(value, str) and re.fullmatch(r"[1-9][0-9]*", value) else None
+    return None
 
 
 def instance_submodel_parts(value: str) -> tuple[str, str] | None:

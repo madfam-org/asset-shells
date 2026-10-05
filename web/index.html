@@ -82,7 +82,7 @@
     </div>
     <p>Los identificadores van en la ruta codificados en base64url sin relleno, como pide la especificación:</p>
 <pre><code># ejemplo / example
-ID=$(printf '%s' 'https://id.madfam.io/aas/solid/&lt;slug&gt;/&lt;16-hex&gt;' | base64 | tr '+/' '-_' | tr -d '=\n')
+ID=$(printf '%s' 'https://id.madfam.io/aas/solid/&lt;slug&gt;/&lt;16-hex&gt;/p1' | base64 | tr '+/' '-_' | tr -d '=\n')
 curl -s "https://asset-shells-api.madfam.io/api/v3.1/shells/$ID"</code></pre>
     <p>Publicación en <code>/madfam/v1</code>: solo clientes de servicio de MADFAM con un token RS256 emitido por Janua y el alcance correspondiente. No hay cuentas de usuario.</p>
   </section>
@@ -91,8 +91,8 @@ curl -s "https://asset-shells-api.madfam.io/api/v3.1/shells/$ID"</code></pre>
     <h2 id="h-ids">Identificadores permanentes</h2>
     <ul class="plain">
       <li>Diseño: <code>https://id.madfam.io/asset/{solid|soft}/{slug}</code></li>
-      <li>Expediente de una revisión: <code>https://id.madfam.io/aas/{solid|soft}/{slug}/{16 hex del árbol}</code></li>
-      <li>Ficha de material: <code>https://id.madfam.io/aas/material/{slug}/{16 hex del contenido}</code></li>
+      <li>Expediente de una revisión: <code>https://id.madfam.io/aas/{solid|soft}/{slug}/{16 hex del árbol}/p{N}</code> (<code>N</code>: versión de la proyección)</li>
+      <li>Ficha de material: <code>https://id.madfam.io/aas/material/{slug}/{16 hex del contenido}/p{N}</code></li>
       <li>Pieza fabricada: <code>https://id.madfam.io/aas/instance/{uuid}</code></li>
       <li>Conceptos del léxico: <code>https://id.madfam.io/concept/{término}</code></li>
     </ul>

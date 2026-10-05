@@ -1,16 +1,17 @@
 """SEM-1 rules on whole environments, applied after the metamodel gates (validation.py) pass.
 
 Type environments (``PUT /madfam/v1/type-environments/{commons}/{sha}``):
-* shell ids ``https://id.madfam.io/aas/{solid|soft|material}/{slug}/{hex16}``; the kind must be one the
-  commons may publish; ``assetKind`` = Type; ``globalAssetId`` = ``…/asset/{kind}/{slug}``;
-  no ``derivedFrom`` (SEM-1 §5);
+* shell ids ``https://id.madfam.io/aas/{solid|soft|material|assembly}/{slug}/{hex16}/p{N}`` (``N`` = the keystone
+  projection version, hyperobjects-spec 0.6.0); the kind must be one the commons may publish; ``assetKind`` = Type;
+  ``globalAssetId`` = ``…/asset/{kind}/{slug}``; no ``derivedFrom`` (SEM-1 §5); the ``ProjectionVersion``
+  extension states the ``N`` of the id;
 * design shells (solid/soft) carry the specificAssetIds ``commons`` (= the path commons), ``slug``
   (= the id slug) and ``tree_sha256`` (64 hex, starting with the id's hex16); assembly shells
   (ASM-1 §5, solid commons only) carry ``commons``, ``slug`` and ``assembly_digest`` likewise, and are
   re-validated by the keystone before they are stored (``assemblies.py``);
-* every submodel id is ``…/sm/{kind}/{slug}/{hex16}/{SubmodelIdShort}`` with ``SubmodelIdShort`` equal
-  to the submodel's idShort, is referenced by exactly one shell of the same design revision, and every
-  reference resolves inside the environment;
+* every submodel id is ``…/sm/{kind}/{slug}/{hex16}/p{N}/{SubmodelIdShort}`` with ``SubmodelIdShort`` equal
+  to the submodel's idShort, is referenced by exactly one shell of the same design revision and projection
+  version, and every reference resolves inside the environment;
 * concept descriptions describe MADFAM semantic ids: concepts ``…/concept/{term}`` or submodel
   templates ``…/smt/{template}/{major}/{minor}``.
 
@@ -20,7 +21,7 @@ submodels ``…/sm/instance/{uuid}/{SubmodelIdShort}``, an optional ``derivedFro
 no concept descriptions.
 
 Deviation recorded in the report: SEM-1 §1 names no submodel id for material shells; the analogous
-``…/sm/material/{slug}/{content16}/{SubmodelIdShort}`` is accepted.
+``…/sm/material/{slug}/{content16}/p{N}/{SubmodelIdShort}`` is accepted.
 """
 
 from __future__ import annotations
@@ -37,6 +38,7 @@ from .ids import (
     is_template_id,
     parse_instance_shell_id,
     parse_type_shell_id,
+    shell_projection_version,
     type_submodel_parts,
 )
 
@@ -84,6 +86,14 @@ def _check_type_shell(shell: dict, tsid: TypeShellId, commons: str, base: str, p
         )
     if "derivedFrom" in shell:
         problems.append(Problem("derived_from", "type shells carry no derivedFrom (SEM-1 §5)", f"{base}/derivedFrom"))
+    if shell_projection_version(shell) != tsid.projection:
+        problems.append(
+            Problem(
+                "projection_version",
+                f"the shell's ProjectionVersion extension must state {tsid.projection}, the version its id carries",
+                f"{base}/extensions",
+            )
+        )
     specific = _specific(shell)
     for name, values in specific.items():
         if len(values) > 1:
@@ -133,7 +143,8 @@ def type_environment_problems(env: dict, commons: str, base: str) -> list[Proble
             problems.append(
                 Problem(
                     "id_scheme",
-                    "type shell ids are https://id.madfam.io/aas/{solid|soft|material}/{slug}/{hex16} (SEM-1 §1)",
+                    "type shell ids are https://id.madfam.io/aas/{solid|soft|material|assembly}/{slug}/{hex16}/p{N} "
+                    "(SEM-1 §1; N = the projection version)",
                     f"{sbase}/id",
                 )
             )
@@ -164,15 +175,15 @@ def type_environment_problems(env: dict, commons: str, base: str) -> list[Proble
             problems.append(
                 Problem(
                     "id_scheme",
-                    "type submodel ids are https://id.madfam.io/sm/{solid|soft|material}/"
-                    "{slug}/{hex16}/{SubmodelIdShort} (SEM-1 §1)",
+                    "type submodel ids are https://id.madfam.io/sm/{solid|soft|material|assembly}/"
+                    "{slug}/{hex16}/p{N}/{SubmodelIdShort} (SEM-1 §1)",
                     f"{mbase}/id",
                 )
             )
             continue
-        if submodel.get("idShort") != parts[3]:
+        if submodel.get("idShort") != parts[4]:
             problems.append(
-                Problem("id_scheme", f"the submodel idShort must be '{parts[3]}' (last id segment)", f"{mbase}/idShort")
+                Problem("id_scheme", f"the submodel idShort must be '{parts[4]}' (last id segment)", f"{mbase}/idShort")
             )
         if sm_id not in submodel_owner:
             problems.append(

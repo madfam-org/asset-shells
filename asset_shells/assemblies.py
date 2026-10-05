@@ -13,11 +13,19 @@ A type assembly is accepted only when the keystone says so, here, against what a
    exactly that projection (same digest, same BoM, same mates, same placements). The edges the publish writes
    are therefore read from content the service derived itself, not from whatever a publisher claimed.
 
+Projection versions (hyperobjects-spec 0.6.0): the keystone projects at ITS ``PROJECTION_VERSION``, so a publish
+must carry that version (another one is a 422 ``assembly_projection_version``: build with the service's pin). A
+STORED shell of an older version is still re-validated on read (``/validation``): the document, resolution and
+mating checks run as always, and the byte comparison is reported as not applicable (``projection.compared`` is
+false) because the keystone no longer writes that version's bytes.
+
 An INSTANCE assembly (Phase 5) is an instance shell whose ``derivedFrom`` is a type assembly shell. It must
 match its type: its BillOfMaterials names exactly the type's components (``ComponentId``); a cartridge
 component is an instance asset of this tenant whose shell is ``derivedFrom`` the type component's revision;
 a standard or external component is referenced, not serialised, so it names the same asset (or URL) as the
-type. Its ``mates_with`` edges are the type's mates, mapped onto the instance components.
+type. Matching is by design REVISION (kind, slug, digest16): an instance derived from any projection version of
+the type component's revision matches. Its ``mates_with`` edges are the type's mates, mapped onto the instance
+components.
 """
 
 from __future__ import annotations
@@ -26,6 +34,7 @@ from dataclasses import dataclass, field
 from functools import cache
 
 import psycopg
+from hyperobjects_aas import ids as keystone_ids
 from hyperobjects_aas.assembly import (
     AssemblyProjectionError,
     assembly_document_from_environment,
@@ -56,6 +65,11 @@ def keystone_version() -> str:
     return version("hyperobjects-spec")
 
 
+def keystone_projection_version() -> int:
+    """The projection version the pinned keystone writes (read at call time)."""
+    return keystone_ids.PROJECTION_VERSION
+
+
 def is_assembly_shell(shell_id: str) -> bool:
     parsed = parse_type_shell_id(shell_id)
     return parsed is not None and parsed.kind == ASSEMBLY_KIND
@@ -82,24 +96,49 @@ class AssemblyCheck:
     shell_id: str
     problems: list[Problem] = field(default_factory=list)
     report: dict | None = None
+    #: Whether the stored bytes were compared with the keystone's projection (False for an older version).
+    compared: bool = False
 
     @property
     def ok(self) -> bool:
         return not self.problems
 
     def body(self) -> dict:
+        parsed = parse_type_shell_id(self.shell_id)
         return {
             "shellId": self.shell_id,
             "ok": self.ok,
             "keystone": keystone_version(),
+            "projection": {
+                "shell": parsed.projection if parsed else None,
+                "keystone": keystone_projection_version(),
+                "compared": self.compared,
+            },
             "problems": [{"code": p.code, "text": p.text, "path": p.path} for p in self.problems],
             "report": self.report,
         }
 
 
-def check_type_assembly(shell: dict, submodels: list[dict], fetch, base: str = "") -> AssemblyCheck:
-    """Re-validate one type assembly shell with the keystone and require it to be the keystone's projection."""
+def check_type_assembly(
+    shell: dict, submodels: list[dict], fetch, base: str = "", *, publishing: bool = True
+) -> AssemblyCheck:
+    """Re-validate one type assembly shell with the keystone and require it to be the keystone's projection.
+
+    ``publishing``: a publish must carry the keystone's projection version (else a 422); a read of a stored shell
+    of another version re-validates the assembly and skips only the byte comparison."""
     check = AssemblyCheck(shell["id"])
+    parsed = parse_type_shell_id(shell["id"])
+    current = keystone_projection_version()
+    if publishing and parsed is not None and parsed.projection != current:
+        check.problems.append(
+            Problem(
+                "assembly_projection_version",
+                f"the shell is projection version {parsed.projection}; this service's keystone "
+                f"({keystone_version()}) projects version {current}: build with the same keystone pin",
+                base or "/",
+            )
+        )
+        return check
     env = {"assetAdministrationShells": [shell], "submodels": submodels}
     try:
         doc = assembly_document_from_environment(env)
@@ -117,6 +156,9 @@ def check_type_assembly(shell: dict, submodels: list[dict], fetch, base: str = "
             where = f"[{finding.subject}] " if finding.subject else ""
             check.problems.append(Problem("assembly_invalid", f"{finding.code}: {where}{finding.message}", base or "/"))
         return check
+    if parsed is not None and parsed.projection != current:
+        return check  # a stored older projection: valid as an assembly; its bytes are not this keystone's to judge
+    check.compared = True
     expected = build_assembly_environment(doc, report)
     (expected_shell,) = expected["assetAdministrationShells"]
     if canonical_json(expected_shell) != canonical_json(shell):
@@ -220,16 +262,22 @@ def _instance_component_problems(cur: psycopg.Cursor, cid: str, node: dict, type
     row = cur.fetchone()
     if row is None:
         return [Problem("instance_assembly", f"component '{cid}': instance '{asset}' is not published (here)", "/")]
-    if row["derived_from"] != type_revision:
+    if not _same_revision(row["derived_from"], type_revision):
         return [
             Problem(
                 "instance_assembly",
                 f"component '{cid}': instance '{asset}' is derivedFrom '{row['derived_from']}', "
-                f"not the type component '{type_revision}'",
+                f"not a projection of the type component's revision '{type_revision}'",
                 "/",
             )
         ]
     return []
+
+
+def _same_revision(a: str | None, b: str | None) -> bool:
+    """Two type shell ids name the same design revision (any projection version)."""
+    pa, pb = parse_type_shell_id(a or ""), parse_type_shell_id(b or "")
+    return pa is not None and pb is not None and pa.revision == pb.revision
 
 
 def _instance_mates(type_sms: dict[str, dict], bom: dict, nodes: dict[str, dict], type_shell_id: str) -> list[Edge]:

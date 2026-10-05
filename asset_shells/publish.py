@@ -6,7 +6,9 @@ keystone before anything is written (``assemblies.py``).
 Idempotency and immutability:
 * A type release ``(commons, sha)`` is immutable: re-sending the same content is a no-op (200);
   different content for the same pair is a 409. Shells and submodels are immutable per id (the id
-  carries the design-revision digest); concept descriptions follow the lexicon and may be updated.
+  carries the design-revision digest AND the keystone projection version, ``…/{hex16}/p{N}``): a new projection
+  of a stored revision is a NEW shell beside the old one, while different bytes under the same id stay a 409.
+  Concept descriptions follow the lexicon and may be updated.
 * An instance publish is replayable: the same environment again is a 200; anything else for an
   existing id is a 409. Ids owned by another tenant are indistinguishable from "taken" (409).
 * A passport event is identified by its ``eventId``; replaying it is a 200, reusing it is a 409.
@@ -251,7 +253,8 @@ def _store_release(
                         Problem(
                             "immutable",
                             f"'{ident}' already exists with different content; "
-                            "a changed design gets a new tree digest and so a new id",
+                            "a changed design gets a new tree digest, and a changed projection a new projection "
+                            "version (…/p{N}), so either one gets a new id",
                         )
                     )
                 else:

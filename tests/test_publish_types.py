@@ -158,7 +158,7 @@ def test_duplicate_ids_with_different_content_are_rejected(client, auth_header):
                     "keys": [
                         {
                             "type": "AssetAdministrationShell",
-                            "value": "https://id.madfam.io/aas/solid/x/0000000000000000",
+                            "value": "https://id.madfam.io/aas/solid/x/0000000000000000/p1",
                         }
                     ],
                 }
@@ -167,6 +167,26 @@ def test_duplicate_ids_with_different_content_are_rejected(client, auth_header):
             "derivedFrom",
         ),
         (lambda e: e["submodels"][0].update(idShort="Typeplate"), "id_scheme", "/submodels/0/idShort"),
+        (lambda e: e["assetAdministrationShells"][0].pop("extensions"), "projection_version", "/extensions"),
+        (
+            lambda e: e["assetAdministrationShells"][0]["extensions"][0].update(value="2"),
+            "projection_version",
+            "/extensions",
+        ),
+        (
+            # An unversioned (pre-0.6.0) shell id is not a type shell id.
+            lambda e: e["assetAdministrationShells"][0].update(id=e["assetAdministrationShells"][0]["id"][:-3]),
+            "id_scheme",
+            "/assetAdministrationShells/0/id",
+        ),
+        (
+            # A submodel of another projection version is outside the shell's namespace.
+            lambda e: e["assetAdministrationShells"][0]["submodels"][0]["keys"][0].update(
+                value=e["submodels"][0]["id"].replace("/p1/", "/p2/")
+            ),
+            "id_scheme",
+            "/assetAdministrationShells/0/submodels",
+        ),
         (
             lambda e: e["submodels"][0].update(id="https://id.madfam.io/sm/solid/fan-duct/Nameplate"),
             "id_scheme",

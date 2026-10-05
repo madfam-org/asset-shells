@@ -21,7 +21,9 @@ COMMONS = Path(__file__).parent / "fixtures" / "assembly-commons"
 A = "voron-2-4-class-350-motion-frame"
 B = "fpv-5in-freestyle"
 DIGESTS = {
-    A: "58caf08106856e9e98d670bc522cbc7f5cc92ddb0d1b40927c34a36181476ad8",
+    # A (15 components, solid 00e1765) on this keystone's catalog: hyperobjects-spec#44's blind-joint interfaces
+    # changed the extrusion-2020 entry, whose digest enters A's identity (58caf081… before #44).
+    A: "24322cc06fe30ff82dbf11515b6684a51c97a2be33c724943296844587d74614",
     # B with the camera cage (solid #136, 13 mates) on this keystone's catalog; f0db7bdb… at the commons'
     # SPEC_PIN 8c12194, before hyperobjects-spec#41 changed the fpv-frame entry, whose digest enters B's identity.
     B: "96166430930bbe5817f394ef382221f257f0f2de20b67cb38bec02c142e8f23c",
