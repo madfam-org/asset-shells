@@ -74,6 +74,13 @@ this service makes none).
   NetworkPolicies, kustomization with placeholder digests. `enclii.yaml` — project + two services.
 - `scripts/` — test-database roles, licence gate, manifest rules.
 
+## Related repositories and contracts
+
+The README's [Related repositories and contracts](README.md#related-repositories-and-contracts)
+section links the keystone documents this service enforces (SEM-1 projection, ASM-1) and the
+repositories that publish to it. A rule about what a valid assembly or shell is belongs in
+the keystone, not here.
+
 ## Working here
 
 ```bash
