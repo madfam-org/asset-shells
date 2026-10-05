@@ -14,6 +14,7 @@ import json
 import os
 import uuid
 
+import hyperobjects_aas.ids as keystone_ids
 import psycopg
 import pytest
 from aas_fixtures import COMMONS_SHA, COMMONS_SHA_2, instance_env
@@ -34,6 +35,9 @@ from assembly_fixtures import (
 from conftest import APP_URL_ENV, PUB_INST, PUB_TYPES, READ, TENANT_A, TENANT_B
 
 from asset_shells.ids import b64url_encode
+
+#: The pinned keystone's projection version: every shell these tests publish carries it (…/p{P}).
+P = keystone_ids.PROJECTION_VERSION
 
 ASSET_A = f"{BASE}asset/assembly/{A}"
 ASSET_B = f"{BASE}asset/assembly/{B}"
@@ -78,7 +82,7 @@ def published(client, auth_header):
 # ── publish-time validation and the edges it writes ───────────────────────────
 def test_assemblies_publish_after_their_components_with_edges(published, admin_conn):
     assert sorted(published["shells"]["created"]) == sorted(
-        [f"{BASE}aas/assembly/{A}/{DIGESTS[A][:16]}/p1", f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}/p1"]
+        [f"{BASE}aas/assembly/{A}/{DIGESTS[A][:16]}/p{P}", f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}/p{P}"]
     )
     # A: 15 components + 15 mates; B: 13 + 13.
     assert published["edges"] == 15 + 15 + 13 + 13
@@ -86,6 +90,21 @@ def test_assemblies_publish_after_their_components_with_edges(published, admin_c
         "SELECT kind, count(*), bool_and(tenant_id IS NULL) FROM asset_edges GROUP BY kind ORDER BY kind"
     ).fetchall()
     assert rows == [("has_part", 28, True), ("mates_with", 28, True)]
+
+
+def test_the_kinematics_submodel_is_stored_and_served(published, client):
+    """Projection version 2 (ASM-1 §9): every assembly shell carries Kinematics; a rigid assembly has no joints and
+    one validated pose. The service stores and serves it like any other submodel."""
+    sm_id = f"{BASE}sm/assembly/{A}/{DIGESTS[A][:16]}/p{P}/Kinematics"
+    response = client.get(f"/api/v3.1/submodels/{enc(sm_id)}")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["idShort"] == "Kinematics"
+    assert body["semanticId"]["keys"][0]["value"] == f"{BASE}smt/assembly-kinematics/1/0"
+    values = {e["idShort"]: e for e in body["submodelElements"]}
+    assert values["JointCount"]["value"] == "0"
+    sweep = {e["idShort"]: e["value"] for e in values["PoseSweep"]["value"]}
+    assert sweep["PoseCount"] == "1" and sweep["Validated"] == "true"
 
 
 def test_a_replayed_release_writes_no_edges(published, client, auth_header, admin_conn):
@@ -178,7 +197,7 @@ def test_down_from_an_assembly_at_depth_1_is_its_bill_of_materials(published, cl
     assert sum(1 for _f, t, _k in has_part if t == f"{BASE}asset/standard/extrusion-2020") == 3
     root = body["nodes"][0]
     assert root["assetId"] == ASSET_A and root["depth"] == 0
-    assert root["shells"] == [{"id": f"{BASE}aas/assembly/{A}/{DIGESTS[A][:16]}/p1", "kind": "type"}]
+    assert root["shells"] == [{"id": f"{BASE}aas/assembly/{A}/{DIGESTS[A][:16]}/p{P}", "kind": "type"}]
     assert len(body["nodes"]) == 1 + len(targets) == 13
     pod = next(e for e in body["edges"] if e["props"].get("componentId") == "motor_bracket_a")
     assert pod["props"]["typeShell"].startswith(f"{BASE}aas/solid/nema-bracket/")
@@ -235,7 +254,7 @@ def test_validation_of_a_stored_type_assembly(published, client):
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["ok"] is True and body["problems"] == []
-    assert body["shellId"] == f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}/p1"
+    assert body["shellId"] == f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}/p{P}"
     assert body["report"]["digest"] == DIGESTS[B]
     assert len(body["report"]["mates"]) == 13 and all(m["ok"] for m in body["report"]["mates"])
     assert body["keystone"]
@@ -383,7 +402,7 @@ def test_db_edges_are_filtered_and_checked(app_conn):
         app_conn.execute(
             "INSERT INTO asset_edges (from_asset_id, to_asset_id, kind, via_shell_id, position) "
             "VALUES ('x', 'y', 'has_part', %s, 99)",
-            (f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}/p1",),
+            (f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}/p{P}",),
         )
     app_conn.rollback()
 

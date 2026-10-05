@@ -165,6 +165,12 @@ shell id).
 carries the keystone projection version, `…/{hex16}/p{N}`, and the shell repeats it in its `ProjectionVersion`
 extension, which must agree with the id (else 422 `projection_version`).
 
+**Version 2** (hyperobjects-spec 0.7.0, ASM-1 §9; pinned here at 0.8.0) adds the `Kinematics` submodel to every assembly shell (MADFAM
+`smt/assembly-kinematics/1/0`: joints, machine-axis bindings, belt paths, the pose sweep). It is stored and served
+like any other submodel; no allowlist names submodels, and a template id is accepted by its pattern. The service
+re-validates a published assembly, sweep included, with its pinned keystone, and stores p1 and p2 shells of one
+revision side by side.
+
 - **The current projection** of a revision is its stored shell with the **highest** `N`. Versions only grow, so
   that is the newest. `GET /assets/{assetId}/projections` lists every version and marks the current one.
   `/validation` uses the current one unless `projection=` asks for another.
