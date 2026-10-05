@@ -26,11 +26,10 @@ dependencies = [
   "jsonschema>=4.23,<5",
   # The keystone (Apache-2.0): the assembly validator, the AAS projection and the stored-shell resolver run
   # here exactly as in the commons CI (ASM-1 §6). Pinned by full commit SHA; repin with the solid commons'
-  # SPEC_PIN. fd2ae74 is hyperobjects-spec#55's head (0.10.0, projection version 3: assemblies and material cards
-  # project the canonical form their id hashes; the coordinator repins to the merge SHA) on main eeb4679: #45 (ASM-1
-  # §9 kinematics), #49 (the per-mate offset), #50 (--collision and catalog envelopes) and the Phase 6 Voron
-  # 2.4-class catalog (#47, #48, #51, #52, #53).
-  "hyperobjects-spec @ git+https://github.com/madfam-org/hyperobjects-spec@fd2ae741d8431a9fa24ccf0e9fed8a2b6c0c6d88",
+  # SPEC_PIN. 32cb58c is hyperobjects-spec main at 0.10.0: #55 (projection version 3: assemblies and material cards
+  # project the canonical form their id hashes), on #45 (ASM-1 §9 kinematics), #49 (the per-mate offset), #50
+  # (--collision and catalog envelopes), the Phase 6 Voron 2.4-class catalog (#47, #48, #51, #52, #53) and #54.
+  "hyperobjects-spec @ git+https://github.com/madfam-org/hyperobjects-spec@32cb58c19e8807be99143bec09b534b149e8059d",
 ]
 
 [project.optional-dependencies]
