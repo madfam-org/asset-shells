@@ -6,6 +6,8 @@ import pytest
 from aas_fixtures import COMMONS_SHA, COMMONS_SHA_2, clone, material_type_env, solid_type_env
 from conftest import PUB_INST, PUB_TYPES, READ, TENANT_A
 
+from asset_shells.ids import b64url_encode as enc
+
 URL = f"/madfam/v1/type-environments/solid-hyperobjects/{COMMONS_SHA}"
 
 
@@ -36,6 +38,19 @@ def test_publish_creates_then_replays(client, auth_header, admin_conn):
     assert topics.count("type_shell.published") == 2
     assert topics.count("type_release.published") == 1
     assert topics.count("concept_description.changed") == 5
+
+
+def test_underscore_slug_round_trips(client, auth_header):
+    # The keystone's slug grammar allows `_`; such a type shell publishes and reads back unchanged.
+    env = solid_type_env(slug="fan_duct", seed="fan_duct@1.0.0")
+    shell_id = env["assetAdministrationShells"][0]["id"]
+    assert "/aas/solid/fan_duct/" in shell_id
+    response = put(client, auth_header, {"environments": [env]})
+    assert response.status_code == 201, response.text
+    read = client.get(f"/api/v3.1/shells/{enc(shell_id)}")
+    assert read.status_code == 200, read.text
+    assert read.json()["id"] == shell_id
+    assert read.json()["assetInformation"]["globalAssetId"] == "https://id.madfam.io/asset/solid/fan_duct"
 
 
 def test_formatting_only_differences_are_a_noop(client, auth_header):

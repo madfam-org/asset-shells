@@ -8,6 +8,7 @@ import json
 import jsonschema
 import pytest
 from aas_fixtures import instance_env, material_type_env, passport_event, solid_type_env
+from hyperobjects_aas import ids as keystone_ids
 
 from asset_shells import ids, repository, validation, views
 from asset_shells.errors import ApiError
@@ -28,6 +29,39 @@ def test_b64url_round_trip_without_padding(text):
 def test_b64url_rejects_garbage(bad):
     with pytest.raises(ids.InvalidEncodedId):
         ids.b64url_decode(bad)
+
+
+def _keystone_accepts_slug(slug: str) -> bool:
+    try:
+        keystone_ids.asset_id("solid", slug)
+    except ValueError:
+        return False
+    return True
+
+
+SLUG_SAMPLES = [
+    *("fan_duct", "fan-duct", "a", "0", "a--b", "a-", "a_", "x_1-y"),  # the keystone mints these
+    *("_fan", "-fan", "Fan", "fan.duct", "f d", ""),  # and refuses these
+]
+
+
+@pytest.mark.parametrize("slug", SLUG_SAMPLES)
+def test_slug_grammar_matches_the_keystone(slug):
+    # Every id the keystone mints must parse here, and nothing the keystone refuses may.
+    shell = ids.parse_type_shell_id(f"https://id.madfam.io/aas/solid/{slug}/0123456789abcdef/p1")
+    submodel = ids.type_submodel_parts(f"https://id.madfam.io/sm/solid/{slug}/0123456789abcdef/p1/Nameplate")
+    asset = ids.is_type_asset_id(f"https://id.madfam.io/asset/solid/{slug}")
+    accepted = _keystone_accepts_slug(slug)
+    assert (shell is not None) == (submodel is not None) == asset == accepted
+    if accepted:
+        assert shell.slug == slug and shell.asset_id == f"https://id.madfam.io/asset/solid/{slug}"
+
+
+def test_underscore_slugs_parse():
+    assert _keystone_accepts_slug("fan_duct") and not _keystone_accepts_slug("_fan")
+    assert ids.parse_type_shell_id("https://id.madfam.io/aas/solid/fan_duct/0123456789abcdef/p1") is not None
+    assert ids.parse_type_shell_id("https://id.madfam.io/aas/solid/_fan/0123456789abcdef/p1") is None
+    assert ids.parse_type_shell_id("https://id.madfam.io/aas/solid/-fan/0123456789abcdef/p1") is None
 
 
 def test_identifier_parsers():
