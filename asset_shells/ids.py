@@ -21,7 +21,9 @@ from dataclasses import dataclass
 
 ID_BASE = "https://id.madfam.io/"
 
-SLUG = r"[a-z0-9]+(?:-[a-z0-9]+)*"
+#: The commons slug grammar, identical to the keystone's (``hyperobjects_aas.ids``, the ``project.slug`` rule of both
+#: manifest schemas), so every id the keystone mints parses here.
+SLUG = r"[a-z0-9][a-z0-9_-]*"
 HEX16 = r"[0-9a-f]{16}"
 #: The projection version segment: ``p`` + a positive integer without leading zeros.
 PROJECTION = r"p([1-9][0-9]*)"
