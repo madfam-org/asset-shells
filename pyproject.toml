@@ -26,8 +26,8 @@ dependencies = [
   "jsonschema>=4.23,<5",
   # The keystone (Apache-2.0): the assembly validator, the AAS projection and the stored-shell resolver run
   # here exactly as in the commons CI (ASM-1 §6). Pinned by full commit SHA; repin with the solid commons'
-  # SPEC_PIN. 113e2dc is hyperobjects-spec main after #40 (0.5.0, the assembly projection) and #42.
-  "hyperobjects-spec @ git+https://github.com/madfam-org/hyperobjects-spec@113e2dcb9d903bbd2e3bb01162f3a1b53e0c0f82",
+  # SPEC_PIN. f8b9026 is hyperobjects-spec main after #43 (0.6.0, the projection version in every shell id).
+  "hyperobjects-spec @ git+https://github.com/madfam-org/hyperobjects-spec@f8b9026f1078d6a7727a67a0d79766fccf3a2fb2",
 ]
 
 [project.optional-dependencies]

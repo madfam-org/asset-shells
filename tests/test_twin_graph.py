@@ -78,7 +78,7 @@ def published(client, auth_header):
 # ── publish-time validation and the edges it writes ───────────────────────────
 def test_assemblies_publish_after_their_components_with_edges(published, admin_conn):
     assert sorted(published["shells"]["created"]) == sorted(
-        [f"{BASE}aas/assembly/{A}/{DIGESTS[A][:16]}", f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}"]
+        [f"{BASE}aas/assembly/{A}/{DIGESTS[A][:16]}/p1", f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}/p1"]
     )
     # A: 15 components + 15 mates; B: 13 + 13.
     assert published["edges"] == 15 + 15 + 13 + 13
@@ -178,7 +178,7 @@ def test_down_from_an_assembly_at_depth_1_is_its_bill_of_materials(published, cl
     assert sum(1 for _f, t, _k in has_part if t == f"{BASE}asset/standard/extrusion-2020") == 3
     root = body["nodes"][0]
     assert root["assetId"] == ASSET_A and root["depth"] == 0
-    assert root["shells"] == [{"id": f"{BASE}aas/assembly/{A}/{DIGESTS[A][:16]}", "kind": "type"}]
+    assert root["shells"] == [{"id": f"{BASE}aas/assembly/{A}/{DIGESTS[A][:16]}/p1", "kind": "type"}]
     assert len(body["nodes"]) == 1 + len(targets) == 13
     pod = next(e for e in body["edges"] if e["props"].get("componentId") == "motor_bracket_a")
     assert pod["props"]["typeShell"].startswith(f"{BASE}aas/solid/nema-bracket/")
@@ -235,7 +235,7 @@ def test_validation_of_a_stored_type_assembly(published, client):
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["ok"] is True and body["problems"] == []
-    assert body["shellId"] == f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}"
+    assert body["shellId"] == f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}/p1"
     assert body["report"]["digest"] == DIGESTS[B]
     assert len(body["report"]["mates"]) == 13 and all(m["ok"] for m in body["report"]["mates"])
     assert body["keystone"]
@@ -308,7 +308,7 @@ def test_an_instance_component_of_the_wrong_type_is_422(published, client, auth_
     response, _ = _instance_of_b(client, auth_header, TENANT_A, "a3", wrong=("pod_fl",))
     assert response.status_code == 422
     (message,) = response.json()["messages"]
-    assert "component 'pod_fl'" in message["text"] and "not the type component" in message["text"]
+    assert "component 'pod_fl'" in message["text"] and "not a projection of the type component" in message["text"]
 
 
 def test_a_tenant_cannot_see_another_tenants_instance_graph(published, client, auth_header):
@@ -383,7 +383,7 @@ def test_db_edges_are_filtered_and_checked(app_conn):
         app_conn.execute(
             "INSERT INTO asset_edges (from_asset_id, to_asset_id, kind, via_shell_id, position) "
             "VALUES ('x', 'y', 'has_part', %s, 99)",
-            (f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}",),
+            (f"{BASE}aas/assembly/{B}/{DIGESTS[B][:16]}/p1",),
         )
     app_conn.rollback()
 

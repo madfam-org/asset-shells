@@ -150,7 +150,7 @@ def test_via_shell_superpath(types):
     ("path", "status", "code"),
     [
         ("/api/v3.1/shells/not*base64", 400, "bad_identifier"),
-        (f"/api/v3.1/shells/{enc('https://id.madfam.io/aas/solid/nope/0000000000000000')}", 404, "not_found"),
+        (f"/api/v3.1/shells/{enc('https://id.madfam.io/aas/solid/nope/0000000000000000/p1')}", 404, "not_found"),
         ("/api/v3.1/shells?limit=0", 400, "bad_parameter"),
         ("/api/v3.1/shells?cursor=", 400, "bad_cursor"),
         ("/api/v3.1/shells?cursor=bm90LWEtY3Vyc29y", 400, "bad_cursor"),

@@ -25,8 +25,9 @@ Phase 3; contract SEM-1 §6), and its twin graph (Phase 4; ASM-1 §6). Owner dec
    enforced here, `tenant_id` scopes instance data. Row-level security is FORCED; the runtime role is not
    the owner (the service refuses to start otherwise); one tenant setting per transaction, transaction-
    local; composite tenant foreign keys. A presented bad token is never treated as anonymous.
-3. **Immutable types, append-only passports.** A type shell id carries its design-revision digest; a
-   changed design is a new id. Passport corrections are new events. Triggers enforce both for every
+3. **Immutable types, append-only passports.** A type shell id carries its design-revision digest and the
+   keystone projection version (`…/{hex16}/p{N}`, hyperobjects-spec 0.6.0); a changed design or a new
+   projection is a new id, never an update. Passport corrections are new events. Triggers enforce both for every
    role, the owner included.
 4. **No unproven claims (R85).** We implement a *subset* of IDTA-01002 read operations and test each one
    against the official OpenAPI. Never write "AAS-compliant", "conformant", "Industry 4.0" or claim a
@@ -55,7 +56,8 @@ this service makes none).
 - `asset_shells/api_read.py` — Part 2 read routes at `/api/v3.1` (official operationIds).
 - `asset_shells/api_publish.py` — `/madfam/v1` publish routes; `publish.py` — transactional writes + outbox
   + graph edges.
-- `asset_shells/api_graph.py` — `GET /madfam/v1/graph` and `/assemblies/{assetId}/validation`;
+- `asset_shells/api_graph.py` — `GET /madfam/v1/graph`, `/assemblies/{assetId}/validation` and
+  `/assets/{assetId}/projections` (the current projection of a revision = its highest stored `p{N}`);
   `graph.py` — edge extraction and the recursive-CTE walk; `assemblies.py` — the keystone seam (type
   assembly re-validation, instance-assembly matching).
 - `asset_shells/validation.py` — the two gates; `scheme.py` — SEM-1 rules; `ids.py` — id scheme, base64url.

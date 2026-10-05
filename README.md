@@ -96,11 +96,15 @@ unless `extent=withBlobValue`.
 
 `{commons}` is `solid-hyperobjects` or `soft-hyperobjects`; `{sha}` is the 40-hex commit of the published
 commons pin. A release `(commons, sha)` is immutable; shells and submodels are immutable per id (the id
-carries the design-revision digest); concept descriptions may change with the lexicon. A passport event
+carries the design-revision digest **and the projection version**, `…/{hex16}/p{N}`); concept descriptions may
+change with the lexicon. So a new keystone projection of a stored revision is a **new shell** beside the old one
+(201), while different bytes under the same id stay a 409. A new projection reaches the store through a new
+release: the keystone bump and the commons repin give a new `{sha}`, and the same `(commons, sha)` with other
+content is still a 409. A passport event
 is appended to the top-level `Events` SubmodelElementList (of SubmodelElementCollection, no idShort on
 items) of the named instance submodel, then the whole submodel is re-validated.
 
-An **assembly** environment (shell `aas/assembly/{slug}/{digest16}`, published in a `solid-hyperobjects`
+An **assembly** environment (shell `aas/assembly/{slug}/{digest16}/p{N}`, published in a `solid-hyperobjects`
 release) passes a third gate, the pinned keystone (`hyperobjects-spec`, ASM-1 §6):
 
 1. its document is read back from the `AssemblyDocument` Blob;
@@ -115,13 +119,16 @@ release) passes a third gate, the pinned keystone (`hyperobjects-spec`, ASM-1 §
    report (same digest, BoM, mates, placements), else a 422 naming the submodel that differs.
 
 So publishers must build assembly environments with the **same keystone pin** as this service (the solid
-commons' `SPEC_PIN`); a different projection is refused rather than stored.
+commons' `SPEC_PIN`); a different projection is refused rather than stored. A new assembly shell whose projection
+version is not the keystone's (`hyperobjects_aas.PROJECTION_VERSION`) is a 422 `assembly_projection_version`
+before anything else runs. Its BoM names the type shells of the same version, so publish those first.
 
 An **instance assembly** (Phase 5: `POST /instances` with `derivedFrom` a type assembly shell) must match
 its type: its `BillOfMaterials` EntryNode (the instance asset) holds one entity per type component
 (`ComponentId`), each with a HSEBoM `HasPart` from the EntryNode; a cartridge component names an instance
-asset of the same organisation whose shell is `derivedFrom` the type component's revision; a standard or
-external component names the type's asset (or URL). Otherwise 422.
+asset of the same organisation whose shell is `derivedFrom` the type component's revision (matched by
+`{kind, slug, digest16}`, so an instance derived from any projection version of that revision matches); a
+standard or external component names the type's asset (or URL). Otherwise 422.
 
 Every write passes two gates before anything is stored: the official AAS v3.1.2 JSON Schema (vendored in
 `asset_shells/schemas`, with attributes the metamodel does not define rejected) and the BaSyx Python SDK
@@ -133,7 +140,8 @@ messages carry a JSON-pointer `path` into the request body. The document is stor
 | Route | Who | Result |
 |---|---|---|
 | `GET /graph?root={assetId}&direction=down\|up&depth=1..8&kinds=has_part,mates_with,derived_from,same_as` | anyone (type graph); `asset-shells:read` + `tenant_id` adds that tenant's instance graph | `{root, direction, depth, kinds, nodes: [{assetId, depth, shells}], edges: [{from, to, kind, depth, instance, viaShellId, viaSubmodelId, props}], truncated}` / 400 / 401 / 403 / 404 |
-| `GET /assemblies/{assetId}/validation[?revision={digest16}]` | anyone for a type assembly; `asset-shells:read` + `tenant_id` for an instance assembly | the keystone's verdict re-run now over the stored shells: `{assetId, shellId, revisions, ok, keystone, problems, report}`; for an instance also `{instance: {ok, problems}, type: {…}}` / 404 |
+| `GET /assemblies/{assetId}/validation[?revision={digest16}][&projection={N}]` | anyone for a type assembly; `asset-shells:read` + `tenant_id` for an instance assembly | the keystone's verdict re-run now over the stored shells, by default on the latest revision at its current projection: `{assetId, shellId, revisions, ok, keystone, projection: {shell, keystone, compared}, problems, report}`; for an instance also `{instance: {ok, problems}, type: {…}}` / 404 |
+| `GET /assets/{assetId}/projections` | anyone (type assets only) | every stored revision of the asset, oldest first: `{assetId, keystoneProjection, revisions: [{revision, projections: [{version, shellId}], current}]}` / 400 (not a type asset) / 404 |
 
 `assetId` is UTF8-BASE64-URL-encoded as in Part 2; `root` also accepts a plain `https://…` IRI. Defaults:
 `direction=down`, `depth=1`, every kind. The walk is one recursive CTE over `asset_edges` (one row per asset
@@ -150,19 +158,35 @@ Edges, written in the same transaction as the publish that carries them (a repla
 | `derived_from` | instance asset → its type asset (`props.typeShell` = the exact revision) | an instance shell's `derivedFrom` |
 | `same_as` | reserved | — |
 
-A cartridge component's `has_part` edge carries `props.typeShell`, the revision it was resolved at.
+A cartridge component's `has_part` edge carries `props.typeShell`, the revision it was resolved at (a versioned
+shell id).
+
+**Projection versions** (hyperobjects-spec 0.6.0, owner decision 2026-10-04). Every type shell and submodel id
+carries the keystone projection version, `…/{hex16}/p{N}`, and the shell repeats it in its `ProjectionVersion`
+extension, which must agree with the id (else 422 `projection_version`).
+
+- **The current projection** of a revision is its stored shell with the **highest** `N`. Versions only grow, so
+  that is the newest. `GET /assets/{assetId}/projections` lists every version and marks the current one.
+  `/validation` uses the current one unless `projection=` asks for another.
+- **Reading an older version.** `/validation` re-runs the document, resolution and mating checks on an older
+  version as usual. Its bytes are not compared with this keystone's projection (`projection.compared: false`),
+  because the keystone no longer writes that version.
+- **The graph.** Edges stay asset-to-asset. Each projection of an assembly writes its own rows, so a walk shows the
+  same asset-to-asset edges once per stored version, each with `viaShellId`/`viaSubmodelId` naming its versioned row,
+  just as two revisions of an assembly each contribute their edges. Filter on `viaShellId` (the current one from
+  `/projections`) for one version.
 
 ## Identifiers (SEM-1 §1)
 
 | Object | Identifier |
 |---|---|
 | Type asset | `https://id.madfam.io/asset/{solid\|soft}/{slug}` |
-| Type shell | `https://id.madfam.io/aas/{solid\|soft}/{slug}/{tree16}` |
-| Type submodel | `https://id.madfam.io/sm/{solid\|soft}/{slug}/{tree16}/{SubmodelIdShort}` |
-| Material card asset / shell | `https://id.madfam.io/asset/material/{slug}` / `https://id.madfam.io/aas/material/{slug}/{content16}` |
-| Material submodel (not in SEM-1 §1; analogous, accepted) | `https://id.madfam.io/sm/material/{slug}/{content16}/{SubmodelIdShort}` |
-| Assembly asset / shell (ASM-1 §5) | `https://id.madfam.io/asset/assembly/{slug}` / `https://id.madfam.io/aas/assembly/{slug}/{digest16}` (specificAssetIds `commons`, `slug`, `assembly_digest`) |
-| Assembly submodel | `https://id.madfam.io/sm/assembly/{slug}/{digest16}/{SubmodelIdShort}` |
+| Type shell | `https://id.madfam.io/aas/{solid\|soft}/{slug}/{tree16}/p{N}` (`N` = projection version, also the `ProjectionVersion` extension) |
+| Type submodel | `https://id.madfam.io/sm/{solid\|soft}/{slug}/{tree16}/p{N}/{SubmodelIdShort}` |
+| Material card asset / shell | `https://id.madfam.io/asset/material/{slug}` / `https://id.madfam.io/aas/material/{slug}/{content16}/p{N}` |
+| Material submodel (not in SEM-1 §1; analogous, accepted) | `https://id.madfam.io/sm/material/{slug}/{content16}/p{N}/{SubmodelIdShort}` |
+| Assembly asset / shell (ASM-1 §5) | `https://id.madfam.io/asset/assembly/{slug}` / `https://id.madfam.io/aas/assembly/{slug}/{digest16}/p{N}` (specificAssetIds `commons`, `slug`, `assembly_digest`) |
+| Assembly submodel | `https://id.madfam.io/sm/assembly/{slug}/{digest16}/p{N}/{SubmodelIdShort}` |
 | Standard (COTS) part asset | `https://id.madfam.io/asset/standard/{key}` (no shell is stored for it; it is a graph node) |
 | Instance asset / shell | `https://id.madfam.io/asset/instance/{uuid}` / `https://id.madfam.io/aas/instance/{uuid}` |
 | Instance submodel | `https://id.madfam.io/sm/instance/{uuid}/{SubmodelIdShort}` |

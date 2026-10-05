@@ -17,7 +17,7 @@ from asset_shells.errors import ApiError
 # ---------------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("text", ["https://id.madfam.io/aas/solid/fan-duct/0123456789abcdef", "ñandú/ü", "a"])
+@pytest.mark.parametrize("text", ["https://id.madfam.io/aas/solid/fan-duct/0123456789abcdef/p1", "ñandú/ü", "a"])
 def test_b64url_round_trip_without_padding(text):
     encoded = ids.b64url_encode(text)
     assert "=" not in encoded and ids.b64url_decode(encoded) == text
@@ -31,20 +31,31 @@ def test_b64url_rejects_garbage(bad):
 
 
 def test_identifier_parsers():
-    t = ids.parse_type_shell_id("https://id.madfam.io/aas/soft/wrap-dress/0123456789abcdef")
-    assert t == ids.TypeShellId("soft", "wrap-dress", "0123456789abcdef")
+    t = ids.parse_type_shell_id("https://id.madfam.io/aas/soft/wrap-dress/0123456789abcdef/p1")
+    assert t == ids.TypeShellId("soft", "wrap-dress", "0123456789abcdef", 1)
     assert t.asset_id == "https://id.madfam.io/asset/soft/wrap-dress"
-    assert ids.parse_type_shell_id("https://id.madfam.io/aas/solid/Fan/0123456789abcdef") is None
-    assert ids.parse_type_shell_id("https://id.madfam.io/aas/machine/x/0123456789abcdef") is None
+    assert t.submodel_prefix == "https://id.madfam.io/sm/soft/wrap-dress/0123456789abcdef/p1/"
+    t12 = ids.parse_type_shell_id("https://id.madfam.io/aas/soft/wrap-dress/0123456789abcdef/p12")
+    assert t12.projection == 12 and t12.revision == t.revision and t12 != t
+    assert ids.parse_type_shell_id("https://id.madfam.io/aas/solid/Fan/0123456789abcdef/p1") is None
+    assert ids.parse_type_shell_id("https://id.madfam.io/aas/machine/x/0123456789abcdef/p1") is None
+    # Unversioned (pre-0.6.0) ids, and malformed versions, are not type shell ids.
+    for bad in ("", "/p0", "/p01", "/v1", "/p1/"):
+        assert ids.parse_type_shell_id(f"https://id.madfam.io/aas/solid/fan/0123456789abcdef{bad}") is None
     i = ids.parse_instance_shell_id("https://id.madfam.io/aas/instance/1b4e28ba-2fa1-4d2b-9e6b-1c2f3a4b5c6d")
     assert i is not None and i.asset_id.endswith("/asset/instance/1b4e28ba-2fa1-4d2b-9e6b-1c2f3a4b5c6d")
     assert ids.parse_instance_shell_id("https://id.madfam.io/aas/instance/1B4E28BA-2FA1-4D2B-9E6B-1C2F3A4B5C6D") is None
-    assert ids.type_submodel_parts("https://id.madfam.io/sm/solid/a-b/0123456789abcdef/Nameplate") == (
+    assert ids.type_submodel_parts("https://id.madfam.io/sm/solid/a-b/0123456789abcdef/p3/Nameplate") == (
         "solid",
         "a-b",
         "0123456789abcdef",
+        3,
         "Nameplate",
     )
+    assert ids.type_submodel_parts("https://id.madfam.io/sm/solid/a-b/0123456789abcdef/Nameplate") is None
+    assert ids.shell_projection_version({"extensions": [{"name": "ProjectionVersion", "value": "2"}]}) == 2
+    assert ids.shell_projection_version({"extensions": [{"name": "ProjectionVersion", "value": "02"}]}) is None
+    assert ids.shell_projection_version({}) is None
     assert ids.instance_submodel_parts("https://id.madfam.io/sm/instance/x/Nameplate") is None
     assert ids.is_type_asset_id("https://id.madfam.io/asset/material/pla-basic")
     assert ids.is_instance_asset_id("https://id.madfam.io/asset/instance/1b4e28ba-2fa1-4d2b-9e6b-1c2f3a4b5c6d")

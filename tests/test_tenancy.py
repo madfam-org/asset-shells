@@ -199,7 +199,7 @@ def test_db_writes_are_checked(app_conn):
     with pytest.raises(psycopg.errors.InsufficientPrivilege):  # a type row under tenant context
         app_conn.execute(
             "INSERT INTO shells (id, kind, tenant_id, doc, content_sha256) VALUES (%s, 'type', NULL, '{}', %s)",
-            ("https://id.madfam.io/aas/solid/x/0000000000000000", "0" * 64),
+            ("https://id.madfam.io/aas/solid/x/0000000000000000/p1", "0" * 64),
         )
     _as(app_conn, None)
     with pytest.raises(psycopg.errors.InsufficientPrivilege):  # an instance row without tenant context
