@@ -171,6 +171,15 @@ like any other submodel; no allowlist names submodels, and a template id is acce
 re-validates a published assembly, sweep included, with its pinned keystone, and stores p1 and p2 shells of one
 revision side by side.
 
+**Version 3** (hyperobjects-spec 0.10.0) is one content hash, one projection. A content-addressed id hashes canonical
+JSON (GOC-1 §3.1, where `220.0` and `220` are one number): a material card's `content16` and an assembly's
+`digest16`. The keystone now projects the input in that same canonical form, so a respelt input republishes as
+*unchanged* instead of a 409. A whole number's untyped value is `xs:integer`, and a fractional one stays `xs:double`.
+Assembly bytes did not move. A card's whole-float values did (`xs:double` → `xs:integer`), so the version is 3. An
+assembly the service re-projects from its stored `AssemblyDocument` blob, which is canonical JSON, now matches what
+its publisher projected from its own document. The service needs no code change: p1, p2 and p3 shells of one
+revision are stored side by side.
+
 - **The current projection** of a revision is its stored shell with the **highest** `N`. Versions only grow, so
   that is the newest. `GET /assets/{assetId}/projections` lists every version and marks the current one.
   `/validation` uses the current one unless `projection=` asks for another.
