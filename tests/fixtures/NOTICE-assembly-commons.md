@@ -16,7 +16,9 @@ They are licensed **CERN-OHL-W-2.0** by their authors (see each `project.json`; 
 <https://spdx.org/licenses/CERN-OHL-W-2.0.html>), not under this repository's AGPL-3.0-only.
 They are copied unmodified and used as test inputs only: the tests build the type and
 assembly environments from them with the pinned keystone, exactly as a commons publisher
-does, so the digests are the commons CI's for the same keystone (A `24322cc0…` on the pinned keystone's
-catalog, `58caf081…` before hyperobjects-spec#44 changed the `extrusion-2020` entry; B `96166430…` on the
+does, so the digests are the commons CI's for the same keystone (A `35867ffd…` on the pinned keystone's
+catalog, `296caa36…` before hyperobjects-spec#49 gave the `extrusion-2020` slots their `travel`, `24322cc0…`
+before hyperobjects-spec#45 (ASM-1 §9) gave `gt2-pulley-20t-5mm` its `belt_engagement`,
+`58caf081…` before hyperobjects-spec#44 changed the `extrusion-2020` entry; B `96166430…` on the
 pinned keystone's catalog, `f0db7bdb…` at the commons' SPEC_PIN 8c12194, before hyperobjects-spec#41).
 Do not edit them here; refresh them from the commons.
