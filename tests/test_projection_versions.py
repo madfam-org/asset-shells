@@ -33,9 +33,10 @@ from assembly_fixtures import (
     shell_id,
 )
 from conftest import PUB_INST, PUB_TYPES, READ, TENANT_A, TENANT_B
-from hyperobjects_aas import build_solid_environment
+from hyperobjects_aas import build_material_environment, build_solid_environment
 from hyperobjects_aas.assembly import build_assembly_environment
 from hyperobjects_aas.resolver import bundled_standard_parts_dir
+from hyperobjects_schemas.generator_output import normalize_numbers
 from y4d_spec.assembly import CompositeResolver, validate_assembly
 
 from asset_shells.ids import b64url_encode
@@ -153,6 +154,49 @@ def test_material_cards_version_too(client, auth_header):
     second = put_release(client, auth_header, [material_type_env(projection=2)], COMMONS_SHA_2)
     assert first.status_code == 201 and second.status_code == 201, second.text
     assert second.json()["shells"]["created"][0].endswith("/p2")
+
+
+def test_a_respelt_material_card_is_unchanged_not_a_409(client, auth_header, admin_conn):
+    """One content hash, one projection (hyperobjects-spec 0.10.0, projection version 3). The shell id hashes the
+    card's canonical JSON, where 220.0 and 220 are one number, and the keystone now projects that canonical form.
+    So a card that a JSON.stringify round trip respells has the same id AND the same bytes: the second release
+    stores nothing new. Before version 3 the keystone wrote xs:double for 220.0 and xs:integer for 220 under one
+    id, and this release was a 409."""
+    card = {
+        "material": {"slug": "p3-tpu", "name": {"en": "P3 TPU"}, "category": "tpu"},
+        "thermodynamics": {"melting_temp": 220.0, "glass_transition_temp": -30.0, "density": 1.21},
+    }
+    respelt = normalize_numbers(card)
+    melting = respelt["thermodynamics"]["melting_temp"]
+    assert melting == 220 and isinstance(melting, int)
+    as_written, as_respelt = build_material_environment(card), build_material_environment(respelt)
+    shell = as_written["assetAdministrationShells"][0]["id"]
+    assert shell == as_respelt["assetAdministrationShells"][0]["id"] and shell.endswith(f"/p{V1}")
+
+    first = put_release(client, auth_header, [as_written], COMMONS_SHA)
+    second = put_release(client, auth_header, [as_respelt], COMMONS_SHA_2)
+    assert first.status_code == 201 and first.json()["shells"]["created"] == [shell], first.text
+    assert second.status_code == 201 and second.json()["shells"]["created"] == [], second.text
+
+    (stored,) = admin_conn.execute(
+        "SELECT doc FROM submodels WHERE id = %s", (as_written["submodels"][0]["id"],)
+    ).fetchone()
+    props = {}
+
+    def walk(node):
+        if isinstance(node, dict):
+            if node.get("modelType") == "Property":
+                props[node.get("idShort")] = (node.get("valueType"), node.get("value"))
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(stored)
+    assert props["melting_temp"] == ("xs:integer", "220")
+    assert props["glass_transition_temp"] == ("xs:integer", "-30")
+    assert props["density"] == ("xs:double", "1.21")  # only whole numbers follow their canonical value
 
 
 # ── reading ────────────────────────────────────────────────────────────────────
