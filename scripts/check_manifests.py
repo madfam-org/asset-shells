@@ -5,7 +5,8 @@ Usage: kustomize build infra/k8s/production > render.yaml && python scripts/chec
 
 Checks what the cluster's admission policies enforce (images from ghcr.io/madfam-org pinned by
 digest, non-root, no privilege escalation, capabilities drop ALL, read-only root, probes, requests
-and memory limits) plus this repo's own rules: no Namespace/Ingress objects (Enclii owns them), no
+and memory limits) plus this repo's own rules: no Namespace/Ingress/NetworkPolicy objects (Enclii owns them;
+NetworkPolicies are generated from the `network:` sections of enclii.yaml), no
 Secret or ExternalSecret objects (no secret material or store paths in a public repo), and the tunnel
 may reach only the API and the landing pods.
 """
@@ -13,16 +14,19 @@ may reach only the API and the landing pods.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import yaml
 
-ALLOWED_TUNNEL_TARGETS = {"asset-shells-api", "asset-shells-web"}
+ENCLII_YAML = Path(__file__).resolve().parents[1] / "enclii.yaml"
+# Names in enclii.yaml `network.services` (the pods' `app` label) that the tunnel may reach.
+ALLOWED_TUNNEL_SERVICES = {"asset-shells", "asset-shells-web"}
 
 
 def check(docs: list[dict]) -> list[str]:
     errors: list[str] = []
     kinds = [d.get("kind") for d in docs]
-    for forbidden in ("Namespace", "Ingress", "Secret", "ExternalSecret"):
+    for forbidden in ("Namespace", "Ingress", "NetworkPolicy", "Secret", "ExternalSecret"):
         if forbidden in kinds:
             errors.append(f"{forbidden} objects do not belong in this overlay")
     deployments = [d for d in docs if d.get("kind") == "Deployment"]
@@ -56,11 +60,17 @@ def check(docs: list[dict]) -> list[str]:
                 errors.append(f"{where}: liveness and readiness probes are required")
             if c.get("ports") and any("hostPort" in p for p in c["ports"]):
                 errors.append(f"{where}: no host ports")
-    for policy in (d for d in docs if d.get("kind") == "NetworkPolicy"):
-        if "cloudflare-tunnel" in str(policy.get("spec", {}).get("ingress", "")):
-            target = policy["spec"]["podSelector"].get("matchLabels", {}).get("app.kubernetes.io/name")
-            if target not in ALLOWED_TUNNEL_TARGETS:
-                errors.append(f"{policy['metadata']['name']}: the tunnel may reach only the API and landing pods")
+    return errors
+
+
+def check_enclii(docs: list[dict]) -> list[str]:
+    """Rules for the `network:` sections of enclii.yaml, from which Enclii generates the NetworkPolicies."""
+    errors: list[str] = []
+    for doc in docs:
+        for net in ((doc or {}).get("spec", {}).get("network") or {}).get("services", []) or []:
+            name, ingress = net.get("name"), net.get("ingress") or []
+            if "cloudflare-tunnel" in ingress and name not in ALLOWED_TUNNEL_SERVICES:
+                errors.append(f"enclii.yaml {name}: the tunnel may reach only the API and landing pods")
     return errors
 
 
@@ -68,6 +78,8 @@ def main(path: str) -> int:
     with open(path, encoding="utf-8") as fh:
         docs = [d for d in yaml.safe_load_all(fh) if d]
     errors = check(docs)
+    if ENCLII_YAML.exists():
+        errors += check_enclii([d for d in yaml.safe_load_all(ENCLII_YAML.read_text(encoding="utf-8")) if d])
     for e in errors:
         print(f"MANIFEST RULE: {e}")
     if not errors:

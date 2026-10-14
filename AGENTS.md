@@ -71,7 +71,8 @@ this service makes none).
   suite (`test_twin_graph.py`), tenancy proofs, contract tests
   (`contract/specs` = official OpenAPI, CC-BY-4.0), publish/read/auth/ops/manifest suites.
 - `web/` — the landing (static, Caddy, non-root). `infra/k8s/production/` — Deployments, Services,
-  NetworkPolicies, kustomization with placeholder digests. `enclii.yaml` — project + two services.
+  kustomization with placeholder digests. `enclii.yaml` — project + two services, and their
+  `network:` sections, from which Enclii generates the NetworkPolicies (never add them to the overlay).
 - `scripts/` — test-database roles, licence gate, manifest rules.
 
 ## Working here

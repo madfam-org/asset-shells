@@ -85,7 +85,7 @@ spec:
       - name: asset-shells
         port: 8000
         ingress: [cloudflare-tunnel]
-        egress: [dns, postgres, https]
+        egress: [dns, postgres, pgbouncer, https]
 
   dependencies:
     - platform: janua
