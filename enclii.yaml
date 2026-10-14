@@ -9,12 +9,15 @@
 #                     security. Writes require publish scopes.
 #   asset-shells-web  the landing at asset-shells.madfam.io (static, Caddy, non-root).
 #
-# Managed Postgres is provisioned AT onboard (onboard is not idempotent). The addon's credentials
-# own the schema and are used ONLY by the migrate init container; the API connects as a separate
-# non-owner role (APP_DATABASE_URL) — see docs/operator-setup.md. The pool is small (max 4) because
-# the shared Postgres serves the whole fleet.
+# Postgres lives on the shared cluster and is created AT onboard with generated passwords
+# (`enclii onboard --db-name asset_shells --generate-db-password --app-role asset_shells_app`). The owner URL
+# (DATABASE_URL) is used ONLY by the migrate init container; the API connects as the separate non-owner
+# role (APP_DATABASE_URL) — see docs/operator-setup.md. The pool is small (max 4) because the shared
+# Postgres serves the whole fleet. There is no `addons:` block: Enclii never reads `spec.addons` from this
+# file, and `enclii addon create` would provision a second, dedicated database.
 #
-# Nothing here deploys by itself: there is no build-and-deploy workflow in this repository yet.
+# Nothing here deploys by itself: .github/workflows/build-deploy.yml runs only when dispatched
+# (autoDeploy: false).
 apiVersion: enclii.dev/v1
 kind: Project
 metadata:
@@ -71,10 +74,6 @@ spec:
       environment: production
       tlsEnabled: true
 
-  addons:
-    - type: postgres
-      name: asset-shells-db
-
   slo:
     availability: 99.5
     latencyP99Ms: 2000
@@ -92,7 +91,7 @@ spec:
     - platform: janua
       reason: identity — RS256 service tokens (audience asset-shells-api, scopes asset-shells:*), JWKS
     - platform: enclii
-      reason: deploy, managed Postgres addon, secrets intake
+      reason: deploy, Postgres and runtime role with generated passwords, service-client provisioning
 ---
 apiVersion: enclii.dev/v1
 kind: Service
