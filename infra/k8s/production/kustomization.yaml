@@ -11,9 +11,9 @@ resources:
 # before a real, signed build is pinned here (by the shared build-and-publish workflow, once the
 # owner adds it). Kyverno: ghcr.io/madfam-org only, digest-pinned, no :latest.
 images:
-- name: ghcr.io/madfam-org/asset-shells/asset-shells-api
+- digest: sha256:e4b3e69988a4270ebb9b50c5947c26460f45298afed45bbe7f6c2a0faa276057
+  name: ghcr.io/madfam-org/asset-shells/asset-shells-api
   newName: ghcr.io/madfam-org/asset-shells/asset-shells-api
-  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
-- name: ghcr.io/madfam-org/asset-shells/asset-shells-web
+- digest: sha256:37c370772dc3d48ff34df3bee5604740bbddada6f645ab4758aba4b9b0dda80b
+  name: ghcr.io/madfam-org/asset-shells/asset-shells-web
   newName: ghcr.io/madfam-org/asset-shells/asset-shells-web
-  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
