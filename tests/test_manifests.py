@@ -76,13 +76,33 @@ def test_rules_catch_violations(path, value, fragment):
     assert any(fragment in e for e in errors), errors
 
 
-def test_rules_catch_forbidden_objects_and_tunnel_reach():
-    docs = render() + [{"kind": "Secret", "metadata": {"name": "x"}}]
-    policy = next(d for d in docs if d.get("kind") == "NetworkPolicy" and "cloudflare" in str(d["spec"]))
-    policy["spec"]["podSelector"]["matchLabels"]["app.kubernetes.io/name"] = "something-else"
+def enclii_docs() -> list[dict]:
+    return [d for d in yaml.safe_load_all((ROOT / "enclii.yaml").read_text()) if d]
+
+
+def test_rules_catch_forbidden_objects():
+    docs = render() + [
+        {"kind": "Secret", "metadata": {"name": "x"}},
+        {"kind": "NetworkPolicy", "metadata": {"name": "y"}},
+    ]
     errors = check_manifests.check(docs)
-    assert any("Secret" in e for e in errors) and any("tunnel" in e for e in errors)
+    assert any("Secret" in e for e in errors) and any("NetworkPolicy" in e for e in errors)
     assert check_manifests.check(render()[:1])  # missing deployments
+
+
+def test_enclii_network_rules():
+    """Enclii generates the NetworkPolicies from enclii.yaml `network:`; the tunnel rule lives there now."""
+    docs = enclii_docs()
+    assert check_manifests.check_enclii(docs) == []
+    nets = {n["name"]: n for d in docs for n in (d.get("spec", {}).get("network") or {}).get("services", [])}
+    assert {"postgres", "pgbouncer"} <= set(nets["asset-shells"]["egress"])  # Postgres and its pooler
+    assert nets["asset-shells-web"]["egress"] == ["dns"]
+    mutated = copy.deepcopy(docs)
+    for d in mutated:
+        for n in (d.get("spec", {}).get("network") or {}).get("services", []):
+            if n["name"] == "asset-shells-web":
+                n["name"] = "something-else"
+    assert any("tunnel" in e for e in check_manifests.check_enclii(mutated))
 
 
 def test_script_entrypoint(tmp_path, capsys):
