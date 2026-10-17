@@ -17,7 +17,8 @@ API: <https://asset-shells-api.madfam.io>. Agent rules: [AGENTS.md](./AGENTS.md)
 Version 1, in development, **not deployed**. What exists: the service, its migration, tests (including
 tenant-isolation proofs and contract tests against the official IDTA OpenAPI), the landing page and
 the deployment manifests (with placeholder image digests). There is no build-and-deploy workflow yet;
-deploying is an owner decision (docs/operator-setup.md).
+deploying is an owner decision (docs/operator-setup.md). The dated programme status (what landed, open
+PRs in merge order, next steps) is [`docs/STATUS.md`](docs/STATUS.md); the open-PR list on GitHub is authoritative.
 
 Not in v1: the outbox relay (webhooks/SSE — changes are recorded in the `outbox` table, nothing reads it
 yet), the Concept Description repository read API, `/description`, `/serialization`, attachments and
@@ -165,7 +166,7 @@ shell id).
 carries the keystone projection version, `…/{hex16}/p{N}`, and the shell repeats it in its `ProjectionVersion`
 extension, which must agree with the id (else 422 `projection_version`).
 
-**Version 2** (hyperobjects-spec 0.7.0, ASM-1 §9; pinned here at 0.8.0) adds the `Kinematics` submodel to every assembly shell (MADFAM
+**Version 2** (hyperobjects-spec 0.7.0, ASM-1 §9) adds the `Kinematics` submodel to every assembly shell (MADFAM
 `smt/assembly-kinematics/1/0`: joints, machine-axis bindings, belt paths, the pose sweep). It is stored and served
 like any other submodel; no allowlist names submodels, and a template id is accepted by its pattern. The service
 re-validates a published assembly, sweep included, with its pinned keystone, and stores p1 and p2 shells of one
@@ -267,6 +268,18 @@ The database tests ERROR (they are never skipped) when the two URLs are missing.
   assembly validator, the AAS projection and the stored-shell resolver run here exactly as in the commons
   CI. Repin it together with the solid commons' `SPEC_PIN`. The image's build stage installs `git` to fetch
   it; the runtime image has no git and no pip.
+
+## Related repositories and contracts
+
+Each link goes to the document that defines the contract on the other side.
+
+| Contract | Defined in | What this service relies on |
+|---|---|---|
+| The AAS projection and projection versions (SEM-1) | hyperobjects-spec [`README.md`](https://github.com/madfam-org/hyperobjects-spec/blob/main/README.md) (*AAS projection (SEM-1)*) | the shell and submodel ids it stores (`…/{hex16}/p{N}`, versions 1–3) |
+| Assemblies, kinematics and the assembly shell (ASM-1 §5, §6, §9) | hyperobjects-spec [`docs/ASSEMBLIES.md`](https://github.com/madfam-org/hyperobjects-spec/blob/main/docs/ASSEMBLIES.md) | the validator and projection it re-runs before storing an assembly shell |
+| The assemblies published here | solid-hyperobjects [`assemblies/README.md`](https://github.com/madfam-org/solid-hyperobjects/blob/main/assemblies/README.md) | assembly A (the Voron 2.4-class 350 motion system) and B (a 5-inch FPV frame) |
+| Type shells from the solid platform | yantra4d [`docs/reference/generator-output.md`](https://github.com/madfam-org/yantra4d/blob/main/docs/reference/generator-output.md) | the GOC-1 digests that name a design revision |
+| Instance shells and passports (published by pravara-mes) | pravara-mes [`packages/sparkplug/README.md`](https://github.com/madfam-org/pravara-mes/blob/main/packages/sparkplug/README.md) (its machine-telemetry package) | the manufacturing side; this service defines the instance-shell rules itself (*Publish API*) |
 
 ## Third-party material
 
